@@ -1,19 +1,59 @@
 # First Thought V2
 
-A v2 demo of a low-information differential diagnosis whiteboard for clinical reasoning microskills.
+A low-information differential diagnosis whiteboard for clinical reasoning
+practice. Faculty open a synthetic chief complaint, students write a first-pass
+differential in four minutes, and the app shows the group where the reasoning
+was broad, where it was narrow, and which dangerous diagnoses nobody named.
 
-Faculty start a session with a synthetic chief complaint. Students submit anonymous DDx responses. The app shows aggregate reasoning patterns: category breadth, can-miss coverage, important misses, and one teaching pearl.
-
-The demo now scales the amount of case information by learner level:
+The amount of case information scales by learner level:
 
 - M1: chief complaint only
 - M2: chief complaint plus basic patient demographics
 - M3: demographics, symptom details, and medical history
 - M4: fuller case frame with medications and risk factors
 
-The intent is formative practice, not grading: repeated short reps that help learners reason early, tolerate uncertainty, and separate most likely from most dangerous.
+The intent is formative practice, not grading. Short repeated reps that help
+learners reason early, tolerate uncertainty, and separate most likely from most
+dangerous.
 
-The demo is intentionally browser-only:
+## How the scoring works
+
+The app does not use a language model. It matches what students write against a
+curated table of diagnosis names and abbreviations in `src/scoring/diagnoses.ts`.
+
+Matching is done on whole word sequences, never on substrings, and the longest
+match wins. This matters: an earlier version used substring matching, which
+scored "migraine" as an acute coronary syndrome, "appendicitis" as a pulmonary
+embolism, and "brain bleed" as a GI bleed. Every one of those cases is now a
+test in `src/scoring/match.test.ts`.
+
+Anything a student writes that the table does not recognise is collected and
+shown to the instructor rather than being silently scored as a miss. Review
+those after each session and add real answers to the table.
+
+### Two coverage numbers, and only one of them is an outcome
+
+The app reports can't-miss coverage twice.
+
+- **Mean individual coverage** is the average, across students, of the share of
+  the case's can't-miss list that each student named on their own. This is the
+  number to analyse and the number to compare between groups.
+- **Named by at least one student** is the union across the whole room. It only
+  ever goes up as more students submit, so a larger group will always score
+  higher than a smaller one regardless of how well anyone reasoned. It is a
+  teaching display for the debrief. Do not compare groups on it.
+
+## Data
+
+One row per submission, exported as CSV, with the raw text alongside every
+derived score so a disputed score can be checked against what the student
+actually wrote.
+
+Study IDs are entered by the instructor and never leave the browser. The app
+holds no crosswalk between a study ID and a student name. That crosswalk lives
+outside the app with a data custodian who is not the investigator.
+
+The app is browser-only:
 
 - no PHI
 - no student names
@@ -21,40 +61,28 @@ The demo is intentionally browser-only:
 - no external model calls
 - formative use only
 
-## Local Development
+## Answer keys are draft
+
+The can't-miss lists, important-miss lists, and pearls have not been signed off
+by the reviewing physicians yet, and have not been checked against the course
+objectives. See `docs/answer-key-review.md`.
+
+## Development
 
 ```bash
 npm install
-npm run dev
+npm run dev      # local server
+npm test         # scoring and export tests
+npm run lint
+npm run build    # production build in dist/
 ```
 
-Open the local URL Vite prints, usually `http://127.0.0.1:5173`.
+## Deploy
 
-## Build
+`netlify.toml` is set up for Netlify. Connect the repo in Netlify and it will
+pick up the build settings, or deploy the built `dist/` directory with the
+Netlify CLI.
 
-```bash
-npm run build
-```
+## License
 
-The production site is generated in `dist/`.
-
-## Netlify Deploy
-
-This repo includes `netlify.toml`:
-
-```toml
-[build]
-  command = "npm run build"
-  publish = "dist"
-```
-
-Deploy options:
-
-1. Push this repo to GitHub and connect it in Netlify. Netlify will detect the build settings.
-2. Or deploy directly with the Netlify CLI:
-
-```bash
-npx netlify deploy --prod --dir=dist
-```
-
-Run `npm run build` first if deploying with the CLI.
+MIT. See `LICENSE`.

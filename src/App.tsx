@@ -1,36 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
+import { infoLabels, teachingCases, type CaseInfoKey } from './data/cases'
+import { downloadCsv, toCsv } from './export/csv'
+import { scoreSubmission, summarizeRoom, type Submission } from './scoring/score'
 
 type LearnerLevel = 'M1' | 'M2' | 'M3' | 'M4'
-
-type DiagnosisCategory =
-  | 'Cardiovascular'
-  | 'Pulmonary'
-  | 'GI / hepatobiliary'
-  | 'Neurologic'
-  | 'Infectious'
-  | 'Metabolic / endocrine'
-  | 'Renal / GU'
-  | 'Musculoskeletal'
-  | 'Toxicologic'
-  | 'OB / GYN'
-  | 'Psych / behavioral'
-  | 'Other'
-
-type CaseInfoKey = 'demographics' | 'symptomDetails' | 'history' | 'medications' | 'riskFactors'
-
-type TeachingCase = {
-  id: string
-  label: string
-  complaint: string
-  learnerQuestion: string
-  info: Record<CaseInfoKey, string>
-  expectedCategories: DiagnosisCategory[]
-  cannotMiss: string[]
-  importantMisses: string[]
-  pearl: string
-  sampleResponses: string[]
-}
 
 type LevelConfig = {
   label: string
@@ -41,29 +15,35 @@ type LevelConfig = {
   placeholder: string
 }
 
-type ResponseEntry = {
-  id: string
-  learnerId: string
-  text: string
-  createdAt: string
+/** A finished round, kept so switching cases never destroys collected data. */
+type Round = {
+  roundId: string
+  caseId: string
+  level: LearnerLevel
+  submissions: Submission[]
 }
 
 type StoredSession = {
+  version: 2
+  sessionId: string
+  arm: string
   level: LearnerLevel
   caseId: string
-  responses: ResponseEntry[]
+  submissions: Submission[]
+  history: Round[]
   secondsRemaining: number
 }
 
 const STORAGE_KEY = 'first-thought-ddx-session-v2'
 const SESSION_LENGTH_SECONDS = 4 * 60
 
-const infoLabels: Record<CaseInfoKey, string> = {
-  demographics: 'Patient',
-  symptomDetails: 'Symptom details',
-  history: 'Medical history',
-  medications: 'Current meds',
-  riskFactors: 'Risk factors',
+/** crypto.randomUUID is only defined in a secure context. Classroom laptops on a
+ * plain http address would otherwise throw when a student pressed submit. */
+const makeId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 const levelConfig: Record<LearnerLevel, LevelConfig> = {
@@ -101,321 +81,31 @@ const levelConfig: Record<LearnerLevel, LevelConfig> = {
   },
 }
 
-const teachingCases: TeachingCase[] = [
-  {
-    id: 'chest-pain',
-    label: 'Chest pain',
-    complaint: 'A patient presents with chest pain.',
-    learnerQuestion: 'What belongs on the first-pass differential?',
-    info: {
-      demographics: '54-year-old man',
-      symptomDetails: 'Pressure-like discomfort for 45 minutes, radiating to the left shoulder, with diaphoresis.',
-      history: 'Hypertension, type 2 diabetes, GERD.',
-      medications: 'Metformin, lisinopril, omeprazole.',
-      riskFactors: 'Smokes one pack per day. Father had an MI at 58.',
-    },
-    expectedCategories: [
-      'Cardiovascular',
-      'Pulmonary',
-      'GI / hepatobiliary',
-      'Musculoskeletal',
-      'Psych / behavioral',
-    ],
-    cannotMiss: [
-      'Acute coronary syndrome',
-      'Pulmonary embolism',
-      'Aortic dissection',
-      'Tension pneumothorax',
-      'Esophageal rupture',
-    ],
-    importantMisses: ['Pericarditis', 'Myocarditis', 'Pneumonia'],
-    pearl:
-      'Chest pain gets safer when learners name the lethal diagnoses before they argue about the most likely one.',
-    sampleResponses: [
-      'ACS, PE, pneumonia, GERD, costochondritis',
-      'Aortic dissection, pericarditis, pneumothorax, anxiety',
-      'MI, myocarditis, pancreatitis, esophageal rupture',
-    ],
-  },
-  {
-    id: 'dyspnea',
-    label: 'Shortness of breath',
-    complaint: 'A patient presents with shortness of breath.',
-    learnerQuestion: 'What systems could be causing this patient to feel dyspneic?',
-    info: {
-      demographics: '68-year-old woman',
-      symptomDetails: 'Worsening dyspnea for 2 days with pleuritic discomfort and mild cough.',
-      history: 'COPD, heart failure with preserved EF, recent knee replacement.',
-      medications: 'Albuterol, tiotropium, furosemide, apixaban held for surgery.',
-      riskFactors: 'Recent immobility, former smoker, baseline exertional dyspnea.',
-    },
-    expectedCategories: [
-      'Pulmonary',
-      'Cardiovascular',
-      'Infectious',
-      'Metabolic / endocrine',
-      'Toxicologic',
-      'Psych / behavioral',
-    ],
-    cannotMiss: [
-      'Pulmonary embolism',
-      'Acute coronary syndrome',
-      'Pneumothorax',
-      'Sepsis',
-      'Anaphylaxis',
-    ],
-    importantMisses: ['Heart failure', 'COPD exacerbation', 'Anemia'],
-    pearl:
-      'Dyspnea should trigger oxygenation, ventilation, circulation, and metabolic thinking before settling on asthma or anxiety.',
-    sampleResponses: [
-      'Asthma, COPD, CHF, PE, pneumonia',
-      'ACS, pneumothorax, sepsis, anemia',
-      'Anaphylaxis, panic attack, DKA, toxic inhalation',
-    ],
-  },
-  {
-    id: 'abdominal-pain',
-    label: 'Abdominal pain',
-    complaint: 'A patient presents with abdominal pain.',
-    learnerQuestion: 'What dangerous and common diagnoses should be on the board early?',
-    info: {
-      demographics: '27-year-old woman',
-      symptomDetails: 'Sharp right lower quadrant pain since this morning with nausea and one episode of emesis.',
-      history: 'No prior surgeries. Last menstrual period 7 weeks ago.',
-      medications: 'Prenatal vitamin as needed. No anticoagulants.',
-      riskFactors: 'Sexually active, no reliable contraception, no established prenatal care.',
-    },
-    expectedCategories: [
-      'GI / hepatobiliary',
-      'Cardiovascular',
-      'Infectious',
-      'Renal / GU',
-      'Metabolic / endocrine',
-      'OB / GYN',
-    ],
-    cannotMiss: [
-      'AAA rupture',
-      'Mesenteric ischemia',
-      'Ectopic pregnancy',
-      'Appendicitis',
-      'Bowel obstruction',
-    ],
-    importantMisses: ['Ovarian torsion', 'PID', 'Pyelonephritis'],
-    pearl:
-      'Abdominal pain rewards a wide first pass: vascular, surgical, infectious, GU, metabolic, and reproductive diagnoses all deserve room.',
-    sampleResponses: [
-      'Appendicitis, cholecystitis, pancreatitis, gastroenteritis',
-      'AAA, mesenteric ischemia, bowel obstruction, perforated ulcer',
-      'Ectopic pregnancy, ovarian torsion, kidney stone, DKA',
-    ],
-  },
-  {
-    id: 'headache',
-    label: 'Headache',
-    complaint: 'A patient presents with headache.',
-    learnerQuestion: 'What makes this headache dangerous until proven otherwise?',
-    info: {
-      demographics: '35-year-old man',
-      symptomDetails: 'Abrupt severe headache during exercise, maximal within minutes, with vomiting.',
-      history: 'Migraines in college, no recent trauma.',
-      medications: 'No daily medications.',
-      riskFactors: 'Family history of aneurysm. Uses cocaine occasionally.',
-    },
-    expectedCategories: [
-      'Neurologic',
-      'Infectious',
-      'Cardiovascular',
-      'Toxicologic',
-      'Other',
-    ],
-    cannotMiss: [
-      'Subarachnoid hemorrhage',
-      'Meningitis',
-      'Intracranial mass',
-      'Cerebral venous sinus thrombosis',
-      'Carbon monoxide poisoning',
-    ],
-    importantMisses: ['Hypertensive emergency', 'Cervical artery dissection', 'Temporal arteritis'],
-    pearl:
-      'The first move is not migraine versus tension. The first move is deciding whether this could be blood, infection, pressure, vascular injury, or toxin.',
-    sampleResponses: [
-      'Migraine, tension headache, SAH, meningitis',
-      'Intracranial mass, stroke, temporal arteritis, CO poisoning',
-      'Hypertensive emergency, venous sinus thrombosis, sinusitis',
-    ],
-  },
-  {
-    id: 'syncope',
-    label: 'Syncope',
-    complaint: 'A patient presents after passing out.',
-    learnerQuestion: 'Which diagnoses change disposition even if the patient now looks well?',
-    info: {
-      demographics: '72-year-old man',
-      symptomDetails: 'Brief loss of consciousness while walking upstairs, now alert with mild shortness of breath.',
-      history: 'Aortic stenosis, atrial fibrillation, chronic kidney disease.',
-      medications: 'Metoprolol, warfarin, torsemide.',
-      riskFactors: 'No prodrome, exertional episode, anticoagulated, lives alone.',
-    },
-    expectedCategories: [
-      'Cardiovascular',
-      'Neurologic',
-      'Metabolic / endocrine',
-      'Toxicologic',
-      'GI / hepatobiliary',
-    ],
-    cannotMiss: [
-      'Dysrhythmia',
-      'Pulmonary embolism',
-      'GI bleed',
-      'Aortic stenosis',
-      'Seizure',
-    ],
-    importantMisses: ['Hypoglycemia', 'Orthostasis', 'Intracranial hemorrhage'],
-    pearl:
-      'Syncope should trigger a search for rhythm, pump, blood, brain, and toxin problems before accepting a benign explanation.',
-    sampleResponses: [
-      'Vasovagal syncope, orthostasis, dysrhythmia, PE',
-      'GI bleed, seizure, hypoglycemia, intoxication',
-      'Aortic stenosis, ACS, dehydration, ectopic pregnancy',
-    ],
-  },
-]
-
-const categoryKeywords: Record<DiagnosisCategory, string[]> = {
-  Cardiovascular: [
-    'acs',
-    'mi',
-    'coronary',
-    'dissection',
-    'aortic',
-    'aaa',
-    'pericarditis',
-    'myocarditis',
-    'chf',
-    'heart failure',
-    'dysrhythmia',
-    'arrhythmia',
-    'stenosis',
-    'hypertensive',
-  ],
-  Pulmonary: [
-    'pe',
-    'pulmonary embol',
-    'pneumothorax',
-    'asthma',
-    'copd',
-    'pneumonia',
-    'anaphylaxis',
-    'respiratory',
-  ],
-  'GI / hepatobiliary': [
-    'gerd',
-    'esophageal',
-    'rupture',
-    'pancreatitis',
-    'appendicitis',
-    'cholecystitis',
-    'gastroenteritis',
-    'bowel',
-    'perforated',
-    'ulcer',
-    'mesenteric',
-    'bleed',
-    'gib',
-  ],
-  Neurologic: [
-    'sah',
-    'subarachnoid',
-    'stroke',
-    'seizure',
-    'migraine',
-    'tension headache',
-    'mass',
-    'venous sinus',
-    'intracranial',
-    'dissection',
-  ],
-  Infectious: ['sepsis', 'meningitis', 'pneumonia', 'infection', 'sinusitis', 'gastroenteritis', 'pid'],
-  'Metabolic / endocrine': ['dka', 'hypoglycemia', 'anemia', 'metabolic', 'thyroid'],
-  'Renal / GU': ['kidney stone', 'pyelo', 'pyelonephritis', 'renal', 'urinary', 'uti', 'torsion'],
-  Musculoskeletal: ['costochondritis', 'muscle', 'rib', 'strain', 'fracture'],
-  Toxicologic: ['co poisoning', 'carbon monoxide', 'toxic', 'intoxication', 'overdose', 'inhalation', 'cocaine'],
-  'OB / GYN': ['ectopic', 'pregnancy', 'ovarian', 'torsion', 'pid'],
-  'Psych / behavioral': ['anxiety', 'panic', 'psych'],
-  Other: ['temporal arteritis', 'sinusitis', 'dehydration'],
-}
-
-const normalize = (value: string) => value.trim().toLowerCase()
-
-const includesDiagnosis = (responseText: string, diagnosis: string) => {
-  const source = normalize(responseText)
-  const target = normalize(diagnosis)
-
-  if (source.includes(target)) {
-    return true
-  }
-
-  const aliasMap: Record<string, string[]> = {
-    'acute coronary syndrome': ['acs', 'mi', 'myocardial infarction', 'heart attack'],
-    'pulmonary embolism': ['pe'],
-    'aortic dissection': ['dissection'],
-    'tension pneumothorax': ['pneumothorax', 'ptx'],
-    'esophageal rupture': ['boerhaave', 'rupture'],
-    sepsis: ['septic'],
-    anaphylaxis: ['allergic reaction'],
-    'aaa rupture': ['aaa', 'ruptured aneurysm', 'abdominal aortic aneurysm'],
-    'mesenteric ischemia': ['ischemic bowel'],
-    'ectopic pregnancy': ['ectopic'],
-    'bowel obstruction': ['sbo', 'obstruction'],
-    'subarachnoid hemorrhage': ['sah', 'brain bleed'],
-    meningitis: ['meningitis'],
-    'intracranial mass': ['mass', 'tumor'],
-    'cerebral venous sinus thrombosis': ['cvst', 'venous sinus'],
-    'carbon monoxide poisoning': ['co poisoning', 'carbon monoxide'],
-    dysrhythmia: ['arrhythmia'],
-    'gi bleed': ['gib', 'bleed'],
-    'aortic stenosis': ['stenosis'],
-  }
-
-  return aliasMap[target]?.some((alias) => source.includes(alias)) ?? false
-}
-
-const categorizeResponse = (text: string) => {
-  const source = normalize(text)
-  const categories = Object.entries(categoryKeywords)
-    .filter(([, keywords]) => keywords.some((keyword) => source.includes(keyword)))
-    .map(([category]) => category as DiagnosisCategory)
-
-  return categories.length > 0 ? categories : (['Other'] as DiagnosisCategory[])
-}
-
-const createLearnerId = (index: number) =>
-  `Learner ${String(1000 + index * 37 + 14).slice(-4)}`
-
-const createResponse = (text: string, index: number): ResponseEntry => ({
-  id: crypto.randomUUID(),
-  learnerId: createLearnerId(index),
-  text,
-  createdAt: new Date().toISOString(),
-})
-
 const getStoredSession = (): StoredSession | null => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as StoredSession) : null
+    if (!raw) {
+      return null
+    }
+    const parsed = JSON.parse(raw) as Partial<StoredSession>
+    return parsed.version === 2 ? (parsed as StoredSession) : null
   } catch {
     return null
   }
 }
 
 function App() {
-  const storedSession = useMemo(() => getStoredSession(), [])
-  const [level, setLevel] = useState<LearnerLevel>(storedSession?.level ?? 'M1')
-  const [caseId, setCaseId] = useState(storedSession?.caseId ?? teachingCases[0].id)
-  const [responses, setResponses] = useState<ResponseEntry[]>(storedSession?.responses ?? [])
-  const [draftResponse, setDraftResponse] = useState('')
+  const stored = useMemo(() => getStoredSession(), [])
+  const [sessionId, setSessionId] = useState(stored?.sessionId ?? makeId().slice(0, 8))
+  const [arm, setArm] = useState(stored?.arm ?? '')
+  const [level, setLevel] = useState<LearnerLevel>(stored?.level ?? 'M1')
+  const [caseId, setCaseId] = useState(stored?.caseId ?? teachingCases[0].id)
+  const [submissions, setSubmissions] = useState<Submission[]>(stored?.submissions ?? [])
+  const [history, setHistory] = useState<Round[]>(stored?.history ?? [])
+  const [participantId, setParticipantId] = useState('')
+  const [draft, setDraft] = useState('')
   const [secondsRemaining, setSecondsRemaining] = useState(
-    storedSession?.secondsRemaining ?? SESSION_LENGTH_SECONDS,
+    stored?.secondsRemaining ?? SESSION_LENGTH_SECONDS,
   )
   const [timerRunning, setTimerRunning] = useState(false)
 
@@ -432,94 +122,134 @@ function App() {
 
   useEffect(() => {
     const session: StoredSession = {
+      version: 2,
+      sessionId,
+      arm,
       level,
       caseId,
-      responses,
+      submissions,
+      history,
       secondsRemaining,
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
-  }, [caseId, level, responses, secondsRemaining])
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
+    } catch {
+      // A full or blocked store must not take the session down mid class.
+    }
+  }, [arm, caseId, history, level, secondsRemaining, sessionId, submissions])
 
   useEffect(() => {
     if (!timerRunning || secondsRemaining <= 0) {
       return undefined
     }
-
     const timer = window.setInterval(() => {
       setSecondsRemaining((current) => Math.max(0, current - 1))
     }, 1000)
-
     return () => window.clearInterval(timer)
   }, [secondsRemaining, timerRunning])
 
-  const aggregate = useMemo(() => {
-    const mentionedCategories = new Set<DiagnosisCategory>()
-    responses.forEach((response) => {
-      categorizeResponse(response.text).forEach((category) => mentionedCategories.add(category))
-    })
+  const scores = useMemo(
+    () => submissions.map((submission) => scoreSubmission(submission, teachingCase.cantMissIds)),
+    [submissions, teachingCase],
+  )
+  const summary = useMemo(
+    () => summarizeRoom(scores, teachingCase.cantMissIds),
+    [scores, teachingCase],
+  )
+  const importantMissSummary = useMemo(
+    () => summarizeRoom(scores, teachingCase.importantMissIds),
+    [scores, teachingCase],
+  )
+  const missingCategories = useMemo(
+    () =>
+      teachingCase.expectedCategories.filter(
+        (category) => !summary.categoryTally.some((entry) => entry.category === category),
+      ),
+    [summary, teachingCase],
+  )
 
-    const dangerMentioned = teachingCase.cannotMiss.filter((diagnosis) =>
-      responses.some((response) => includesDiagnosis(response.text, diagnosis)),
-    )
-    const dangerMissing = teachingCase.cannotMiss.filter(
-      (diagnosis) => !dangerMentioned.includes(diagnosis),
-    )
-    const importantMisses = teachingCase.importantMisses.filter(
-      (diagnosis) => !responses.some((response) => includesDiagnosis(response.text, diagnosis)),
-    )
-    const expectedMissing = teachingCase.expectedCategories.filter(
-      (category) => !mentionedCategories.has(category),
-    )
-
-    return {
-      mentionedCategories: Array.from(mentionedCategories),
-      expectedMissing,
-      dangerMentioned,
-      dangerMissing,
-      importantMisses,
-      safetyCoverage: Math.round((dangerMentioned.length / teachingCase.cannotMiss.length) * 100),
-    }
-  }, [responses, teachingCase])
-
+  const totalCollected = submissions.length + history.reduce((sum, r) => sum + r.submissions.length, 0)
   const minutes = Math.floor(secondsRemaining / 60)
   const seconds = String(secondsRemaining % 60).padStart(2, '0')
 
-  const setCaseAndClear = (nextCaseId: string) => {
-    setCaseId(nextCaseId)
-    setResponses([])
-    setDraftResponse('')
+  const archiveCurrentRound = () => {
+    if (submissions.length > 0) {
+      setHistory((current) => [
+        ...current,
+        { roundId: makeId().slice(0, 8), caseId, level, submissions },
+      ])
+    }
+    setSubmissions([])
+    setDraft('')
     setSecondsRemaining(SESSION_LENGTH_SECONDS)
     setTimerRunning(false)
   }
 
-  const addResponse = (text: string) => {
+  const changeCase = (nextCaseId: string) => {
+    archiveCurrentRound()
+    setCaseId(nextCaseId)
+  }
+
+  const addSubmission = (text: string) => {
     const cleanText = text.trim()
     if (!cleanText) {
       return
     }
-    setResponses((current) => [...current, createResponse(cleanText, current.length + 1)])
-    setDraftResponse('')
+    setSubmissions((current) => [
+      ...current,
+      {
+        id: makeId(),
+        participantId: participantId.trim() || `anon-${current.length + 1}`,
+        text: cleanText,
+        submittedAt: new Date().toISOString(),
+      },
+    ])
+    setDraft('')
+    setParticipantId('')
   }
 
-  const addSampleResponse = () => {
-    const usedTexts = new Set(responses.map((response) => response.text))
+  const addSample = () => {
+    const used = new Set(submissions.map((submission) => submission.text))
     const sample =
-      teachingCase.sampleResponses.find((response) => !usedTexts.has(response)) ??
-      teachingCase.sampleResponses[responses.length % teachingCase.sampleResponses.length]
-    addResponse(sample)
+      teachingCase.sampleResponses.find((response) => !used.has(response)) ??
+      teachingCase.sampleResponses[submissions.length % teachingCase.sampleResponses.length]
+    addSubmission(sample)
   }
 
   const chooseRandomCase = () => {
-    const nextOptions = teachingCases.filter((item) => item.id !== caseId)
-    const next = nextOptions[Math.floor(Math.random() * nextOptions.length)]
-    setCaseAndClear(next.id)
+    const options = teachingCases.filter((item) => item.id !== caseId)
+    changeCase(options[Math.floor(Math.random() * options.length)].id)
   }
 
-  const resetSession = () => {
-    setResponses([])
-    setDraftResponse('')
-    setSecondsRemaining(SESSION_LENGTH_SECONDS)
-    setTimerRunning(false)
+  const exportAll = () => {
+    const rounds: Round[] = [...history, { roundId: 'current', caseId, level, submissions }]
+    const scoredRows = rounds.flatMap((round) => {
+      const roundCase = teachingCases.find((item) => item.id === round.caseId) ?? teachingCases[0]
+      return round.submissions.map((submission) => ({
+        score: scoreSubmission(submission, roundCase.cantMissIds),
+        round,
+      }))
+    })
+
+    if (scoredRows.length === 0) {
+      return
+    }
+
+    // One header, then every round's rows underneath it, so the whole block is
+    // a single file the analyst can open directly.
+    const [header, ...firstRows] = toCsv(
+      [scoredRows[0].score],
+      { sessionId, arm, caseId: scoredRows[0].round.caseId, level: scoredRows[0].round.level },
+    ).split('\n')
+
+    const remainingRows = scoredRows
+      .slice(1)
+      .flatMap(({ score, round }) =>
+        toCsv([score], { sessionId, arm, caseId: round.caseId, level: round.level }).split('\n').slice(1),
+      )
+
+    const csv = [header, ...firstRows, ...remainingRows].join('\n')
+    downloadCsv(csv, `first-thought-${sessionId}-${new Date().toISOString().slice(0, 10)}.csv`)
   }
 
   return (
@@ -534,7 +264,7 @@ function App() {
         </div>
         <div className="privacy-badge">
           <span>Clinician in the loop</span>
-          <strong>No PHI. No names. Aggregate patterns only.</strong>
+          <strong>No PHI. No names. Keyword scoring, not a language model.</strong>
         </div>
       </header>
 
@@ -552,7 +282,7 @@ function App() {
 
         <label>
           Synthetic case
-          <select value={caseId} onChange={(event) => setCaseAndClear(event.target.value)}>
+          <select value={caseId} onChange={(event) => changeCase(event.target.value)}>
             {teachingCases.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
@@ -561,11 +291,28 @@ function App() {
           </select>
         </label>
 
+        <label>
+          Session ID
+          <input value={sessionId} onChange={(event) => setSessionId(event.target.value)} />
+        </label>
+
+        <label>
+          Arm
+          <input
+            value={arm}
+            placeholder="blank outside a pilot"
+            onChange={(event) => setArm(event.target.value)}
+          />
+        </label>
+
         <button type="button" onClick={chooseRandomCase}>
           Random case
         </button>
-        <button type="button" className="secondary" onClick={resetSession}>
-          Reset
+        <button type="button" className="secondary" onClick={archiveCurrentRound}>
+          End round
+        </button>
+        <button type="button" className="secondary" onClick={exportAll} disabled={totalCollected === 0}>
+          Export CSV ({totalCollected})
         </button>
       </section>
 
@@ -625,25 +372,33 @@ function App() {
               <p className="section-label">Student input</p>
               <h2>Anonymous DDx submissions</h2>
             </div>
-            <span>{responses.length} reps</span>
+            <span>{submissions.length} this round</span>
           </div>
+          <label className="field-label">
+            Study ID
+            <input
+              value={participantId}
+              placeholder="the number on the student's card"
+              onChange={(event) => setParticipantId(event.target.value)}
+            />
+          </label>
           <textarea
-            value={draftResponse}
-            onChange={(event) => setDraftResponse(event.target.value)}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
             placeholder={activeLevel.placeholder}
             rows={5}
           />
           <div className="button-row">
-            <button type="button" onClick={() => addResponse(draftResponse)}>
+            <button type="button" onClick={() => addSubmission(draft)}>
               Add response
             </button>
-            <button type="button" className="secondary" onClick={addSampleResponse}>
+            <button type="button" className="secondary" onClick={addSample}>
               Add sample
             </button>
           </div>
           <p className="helper-copy">
-            This stays browser-only. A real pilot should rotate anonymous IDs unless leadership and
-            IRB approve longitudinal tracking.
+            Study IDs never leave this browser and are not linked to a name anywhere in the app. The
+            crosswalk between a study ID and a student is held outside the app by the data custodian.
           </p>
         </section>
 
@@ -654,19 +409,27 @@ function App() {
               <h2>What the room generated</h2>
             </div>
           </div>
-          {responses.length === 0 ? (
+          {scores.length === 0 ? (
             <div className="empty-state">
               Add a response or sample to populate the room-level differential.
             </div>
           ) : (
             <div className="response-list">
-              {responses.map((response) => (
-                <article key={response.id} className="response-card">
+              {scores.map((score) => (
+                <article key={score.submissionId} className="response-card">
                   <div>
-                    <strong>{response.learnerId}</strong>
-                    <span>{categorizeResponse(response.text).join(' + ')}</span>
+                    <strong>{score.participantId}</strong>
+                    <span>
+                      {score.breadth} dx · {score.categoryCount} systems ·{' '}
+                      {score.cantMissNamed.length}/{teachingCase.cantMissIds.length} can&apos;t-miss
+                    </span>
                   </div>
-                  <p>{response.text}</p>
+                  <p>{score.rawText}</p>
+                  {score.parsed.unmatched.length > 0 && (
+                    <p className="unmatched-note">
+                      Not recognised: {score.parsed.unmatched.join(', ')}
+                    </p>
+                  )}
                 </article>
               ))}
             </div>
@@ -676,79 +439,102 @@ function App() {
         <section className="panel assistant-panel">
           <div className="panel-heading">
             <div>
-              <p className="section-label">Aggregate assistant</p>
+              <p className="section-label">Aggregate summary</p>
               <h2>Instructor-facing synthesis</h2>
             </div>
           </div>
 
           <div className="metric-grid">
             <div>
-              <strong>{aggregate.mentionedCategories.length}</strong>
-              <span>categories represented</span>
+              <strong>{summary.n}</strong>
+              <span>students this round</span>
             </div>
             <div>
-              <strong>{aggregate.dangerMentioned.length}</strong>
-              <span>can&apos;t-miss diagnoses named</span>
+              <strong>{summary.meanIndividualCoveragePct}%</strong>
+              <span>mean individual can&apos;t-miss coverage</span>
             </div>
             <div>
-              <strong>{aggregate.safetyCoverage}%</strong>
-              <span>safety coverage</span>
+              <strong>{summary.medianBreadth}</strong>
+              <span>median diagnoses per student</span>
             </div>
             <div>
-              <strong>{responses.length}</strong>
-              <span>anonymous reps</span>
+              <strong>{summary.roomCoveragePct}%</strong>
+              <span>named by at least one student</span>
             </div>
           </div>
 
+          <p className="metric-note">
+            The room number rises automatically as more students submit. Compare groups on the mean
+            individual score, not on the room number.
+          </p>
+
           <div className="assistant-section">
-            <h3>Categories named</h3>
-            <div className="chip-list">
-              {aggregate.mentionedCategories.length > 0 ? (
-                aggregate.mentionedCategories.map((category) => (
-                  <span key={category} className="chip">
-                    {category}
-                  </span>
-                ))
-              ) : (
-                <span className="muted">Waiting for responses</span>
-              )}
-            </div>
+            <h3>Can&apos;t-miss coverage</h3>
+            {summary.n === 0 ? (
+              <span className="muted">Waiting for responses</span>
+            ) : (
+              <ul className="tally-list">
+                {summary.cantMissTally.map((entry) => (
+                  <li key={entry.id} className={entry.namedByCount === 0 ? 'warning' : undefined}>
+                    <span>{entry.name}</span>
+                    <strong>
+                      {entry.namedByCount} of {summary.n} ({entry.namedByPct}%)
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="assistant-section">
             <h3>Important misses to probe</h3>
-            <div className="split-list">
-              <div>
-                <span className="mini-label">Can&apos;t miss</span>
-                {aggregate.dangerMissing.slice(0, 3).map((diagnosis) => (
-                  <p key={diagnosis} className="warning">
-                    {diagnosis}
-                  </p>
+            {importantMissSummary.n === 0 ? (
+              <span className="muted">Waiting for responses</span>
+            ) : (
+              <ul className="tally-list">
+                {importantMissSummary.cantMissTally.map((entry) => (
+                  <li key={entry.id} className={entry.namedByCount === 0 ? 'warning' : undefined}>
+                    <span>{entry.name}</span>
+                    <strong>
+                      {entry.namedByCount} of {importantMissSummary.n}
+                    </strong>
+                  </li>
                 ))}
-                {aggregate.dangerMissing.length === 0 && <p className="positive">Covered</p>}
-              </div>
-              <div>
-                <span className="mini-label">Categories</span>
-                {aggregate.expectedMissing.slice(0, 3).map((category) => (
-                  <p key={category} className="warning">
-                    {category}
-                  </p>
-                ))}
-                {aggregate.expectedMissing.length === 0 && <p className="positive">Broad pass</p>}
-              </div>
-            </div>
+              </ul>
+            )}
           </div>
 
           <div className="assistant-section">
-            <h3>Secondary misses</h3>
+            <h3>Systems not represented</h3>
             <div className="chip-list">
-              {aggregate.importantMisses.slice(0, 4).map((diagnosis) => (
-                <span key={diagnosis} className="chip quiet-chip">
-                  {diagnosis}
-                </span>
-              ))}
+              {missingCategories.length > 0 ? (
+                missingCategories.map((category) => (
+                  <span key={category} className="chip quiet-chip">
+                    {category}
+                  </span>
+                ))
+              ) : (
+                <span className="positive">Broad pass</span>
+              )}
             </div>
           </div>
+
+          {summary.unmatched.length > 0 && (
+            <div className="assistant-section">
+              <h3>Not recognised by the term table</h3>
+              <p className="metric-note">
+                Check these before the debrief. A real answer sitting here is a gap in the term
+                table, not a student error.
+              </p>
+              <div className="chip-list">
+                {summary.unmatched.slice(0, 12).map((fragment) => (
+                  <span key={fragment} className="chip quiet-chip">
+                    {fragment}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="teaching-pearl">
             <span>One-minute pearl</span>
