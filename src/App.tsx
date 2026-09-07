@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { infoLabels, teachingCases, type CaseInfoKey } from './data/cases'
-import { downloadCsv, toCsv } from './export/csv'
+import { toCsv } from './export/csv'
+import { downloadCsv } from './export/download'
 import { scoreSubmission, summarizeRoom, type Submission } from './scoring/score'
 
 type LearnerLevel = 'M1' | 'M2' | 'M3' | 'M4'

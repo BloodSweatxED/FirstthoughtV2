@@ -43,6 +43,29 @@ The app reports can't-miss coverage twice.
   higher than a smaller one regardless of how well anyone reasoned. It is a
   teaching display for the debrief. Do not compare groups on it.
 
+## How students submit
+
+Students submit through a Qualtrics form on their own device. Qualtrics is
+already licensed, security reviewed, and backed up by the institution, so no
+student data touches this application's storage and there is no separate server
+to approve or maintain.
+
+Export the responses from Qualtrics, then score them with the same code the
+classroom display uses:
+
+```bash
+npm run score -- --input export.csv --list-columns
+
+npm run score -- --input export.csv \
+  --id-column Q1 --response-column Q2 \
+  --case chest-pain --level M1 --arm intervention --session w03 \
+  --out scored.csv
+```
+
+Qualtrics exports carry IP address, location, and recipient email by default.
+Ingestion drops every one of those columns and reports what it dropped, so the
+analysis file cannot carry them even by accident.
+
 ## Data
 
 One row per submission, exported as CSV, with the raw text alongside every
