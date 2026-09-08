@@ -2,6 +2,41 @@ import type { DiagnosisCategory } from '../scoring/types'
 
 export type CaseInfoKey = 'demographics' | 'symptomDetails' | 'history' | 'medications' | 'riskFactors'
 
+/**
+ * The facilitator's script for the debrief.
+ *
+ * With nothing displayed in the room, this card is how the exercise actually
+ * reaches a student. It is delivered by 22 facilitators of varying comfort with
+ * acute presentations, so it has to carry someone who has not thought about
+ * aortic dissection in fifteen years through a confident four minute discussion.
+ * A one-line pearl does not do that.
+ */
+export type FacilitationCard = {
+  /** The first thing the facilitator says once the timer stops. */
+  opening: string
+  /** How to run the round of the room. */
+  roundRobin: {
+    prompt: string
+    /** What to do when a student says "same as theirs". */
+    whenRepeated: string
+  }
+  /**
+   * One entry per can't-miss diagnosis, in the same order as cantMissIds.
+   * Two lines each: why it kills, and what should have raised it.
+   */
+  cantMissNotes: {
+    id: string
+    whyItKills: string
+    whatRaisesIt: string
+  }[]
+  /** Questions to use when the room goes quiet. */
+  probes: string[]
+  /** The single most likely reasoning error on this case. */
+  commonTrap: string
+  /** The sixty second close. */
+  close: string
+}
+
 export type TeachingCase = {
   id: string
   label: string
@@ -14,6 +49,11 @@ export type TeachingCase = {
   importantMissIds: string[]
   pearl: string
   sampleResponses: string[]
+  /**
+   * Absent until written and reviewed. A case without a card cannot be used in
+   * the pilot, because the card is the intervention.
+   */
+  card?: FacilitationCard
 }
 
 /**
@@ -52,6 +92,62 @@ export const teachingCases: TeachingCase[] = [
       'Aortic dissection, pericarditis, pneumothorax, anxiety',
       'MI, myocarditis, pancreatitis, esophageal rupture',
     ],
+    card: {
+      opening:
+        'Four minutes, chief complaint only. Nobody had enough information, and that was the point. Let us hear what you generated.',
+      roundRobin: {
+        prompt:
+          'Going around the room: give me one diagnosis from your list and one sentence on why you put it there. Not your best one, just the next one.',
+        whenRepeated:
+          'Do not let "same as theirs" pass. Ask for one nobody has said yet, or ask what they would take off their own list now that they have heard the room.',
+      },
+      cantMissNotes: [
+        {
+          id: 'acs',
+          whyItKills:
+            'An occluded coronary infarcts myocardium within hours. The early deaths are arrhythmia and cardiogenic shock, not the infarct itself.',
+          whatRaisesIt:
+            'Pressure or heaviness rather than sharpness, radiation to jaw or arm, diaphoresis, exertional onset, and the risk factor profile. Worth saying out loud: the textbook presentation is often absent in women, people with diabetes, and older patients.',
+        },
+        {
+          id: 'pulmonary-embolism',
+          whyItKills:
+            'Acute right ventricular failure from a sudden rise in afterload. A large central clot can kill in minutes.',
+          whatRaisesIt:
+            'Pleuritic pain, dyspnea out of proportion to the exam, unexplained tachycardia, hypoxia. Risk factors are immobility, recent surgery, cancer, estrogen, and prior clot. Note that a substantial share of patients have none of them.',
+        },
+        {
+          id: 'aortic-dissection',
+          whyItKills:
+            'The tear propagates. It can rupture into the pericardium and cause tamponade, shear off a coronary, or disrupt the aortic valve. Untreated mortality climbs roughly one percent per hour in the first day.',
+          whatRaisesIt:
+            'Abrupt pain that is maximal at onset rather than building, a tearing or ripping quality, pain that migrates, a pulse or blood pressure difference between arms, a new murmur, or any neurologic deficit alongside chest pain.',
+        },
+        {
+          id: 'pneumothorax',
+          whyItKills:
+            'Under tension, trapped air shifts the mediastinum and obstructs venous return. The patient arrests from obstructive shock, not from the collapsed lung.',
+          whatRaisesIt:
+            'Sudden pleuritic pain with dyspnea, absent breath sounds on one side, hypotension. Think of it in tall thin young people, in COPD, after trauma, and after any procedure near the chest.',
+        },
+        {
+          id: 'esophageal-rupture',
+          whyItKills:
+            'Gastric contents enter the mediastinum and cause mediastinitis. Mortality is very high and rises steeply with every hour of delay.',
+          whatRaisesIt:
+            'Severe pain immediately after forceful vomiting or retching, subcutaneous emphysema in the neck, recent endoscopy. Rare, and the one on this list students almost never say.',
+        },
+      ],
+      probes: [
+        'Several of you said GERD. What would have to be true for reflux to be the whole story in a 54 year old with these risk factors?',
+        'Nobody said dissection. What would you need to hear on history, or find on exam, to put it on the list?',
+        'Of everything on the board, which one can you least afford to be wrong about, and what is the single test that moves you?',
+      ],
+      commonTrap:
+        'Anchoring on the known GERD. This patient has a documented reflux diagnosis and is on omeprazole, so a comfortable benign explanation is sitting right there in the chart. The trap is letting a known chronic diagnosis account for an acute presentation. Name it explicitly if the room falls into it, because they will do it again on a real patient.',
+      close:
+        'The move that keeps patients alive is not picking the right answer in four minutes. It is making sure the lethal handful got named before you started narrowing. You are allowed to be wrong about which one it is. You cannot afford to have never considered it.',
+    },
   },
   {
     id: 'dyspnea',

@@ -11,6 +11,29 @@ The app tells an instructor, in front of a room, that the group missed a
 dangerous diagnosis. If the key is wrong, the app teaches the wrong thing and
 the pilot measures the wrong thing. The key is the intervention.
 
+## The facilitation card is the thing to review hardest
+
+Nothing is displayed to the room during a session. The facilitator works from a
+printed card, so that card is the entire mechanism by which the exercise reaches
+a student. It will be delivered by 22 facilitators of varying comfort with acute
+presentations.
+
+Print one with `npm run card -- --case chest-pain`.
+
+Read it as though you were a general internist who has not thought about aortic
+dissection in fifteen years and has four minutes. If it would not carry you
+through a confident discussion, it is not finished.
+
+Specifically, for each can't-miss diagnosis on the card:
+
+- Is the "why it kills" line mechanistically correct and worth saying out loud?
+- Is the "what raises it" line the thing that would actually make you think of
+  it at the bedside, rather than a textbook list?
+- Is anything on it wrong, dated, or overstated?
+
+And for the card as a whole: is the named trap the real trap on this case, and
+does the close land?
+
 ## What a reviewer is being asked
 
 For each case, answer four questions.
@@ -63,13 +86,16 @@ reporting in the pilot writeup.
 
 ## Case sign-off
 
-| Case | Reviewer 1 | Reviewer 2 | Reviewer 3 | Date | Changes made |
+Both the diagnosis lists and the facilitation card need sign-off. A case is not
+usable in the pilot until both columns are signed.
+
+| Case | Card written | Keys signed | Card signed | Date | Changes made |
 | --- | --- | --- | --- | --- | --- |
-| Chest pain | | | | | |
-| Shortness of breath | | | | | |
-| Abdominal pain | | | | | |
-| Headache | | | | | |
-| Syncope | | | | | |
+| Chest pain | yes | | | | |
+| Shortness of breath | no | | | | |
+| Abdominal pain | no | | | | |
+| Headache | no | | | | |
+| Syncope | no | | | | |
 
 ## Reviewers
 

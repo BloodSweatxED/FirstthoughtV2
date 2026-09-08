@@ -73,23 +73,29 @@ This is the part to read carefully.
 has to be designed once and reused for every session, including how the study ID
 is captured and how the case is identified.
 
-**2. Printable individual feedback slips.** This is now the largest functional
-gap and the one thing on the critical path for January.
+**2. Twenty-one more facilitation cards.** This is the critical path.
 
-The design no longer displays anything in the classroom, which removes all
-technical risk from the session itself. In exchange, the entire teaching value
-now rests on returning each student a slip the following week showing what they
-personally missed. The scoring engine already produces exactly that data. What
-does not exist is a way to turn one Qualtrics export into 6 printable slips
-labelled by study number, ready to hand out.
+Nothing is displayed in the classroom, so the card is the intervention. One
+card exists, for chest pain. Print it with `npm run card -- --case chest-pain`.
 
-This has to be genuinely one command, because it will run about 220 times across
-the block. If it takes ten minutes of fiddling per group per week, it will not
-happen by March.
+Each card carries the opening line, the round-the-room prompt and what to do
+when a student says "same as theirs", one lethality line and one recognition
+line for every can't-miss diagnosis, three probes for a quiet room, the specific
+reasoning trap on that case, and a sixty second close.
 
-A live in-room display was considered and dropped. It would require a server, a
-security review, and a maintainer, and it would put a point of failure in front
-of 22 facilitators twenty times each.
+This is clinical writing, not code, which puts the three reviewing physicians on
+the critical path with it. A case without a signed card cannot be used.
+
+Weekly individual feedback slips were considered and dropped. The round-the-room
+discussion already gives students corrective feedback while their own answer is
+still live, which is most of what slips would have provided. What discussion
+cannot do is show a pattern across weeks, so that is handled by two personal
+summaries per block instead of twenty slips. That drops the recurring
+operational burden from about 220 batch runs to 44.
+
+A live in-room display was also considered and dropped. It would require a
+server, a security review, and a maintainer, and it would put a point of failure
+in front of 22 facilitators twenty times each.
 
 **3. Twenty-one more cases.** Five exist. Sixteen to twenty sessions with no
 repeats, plus spares, plus cases held back for the baseline task and the OSCE
@@ -123,13 +129,13 @@ twenty sessions means something will fail at some point.
 
 In order:
 
-1. Slip generation built, so one export becomes six printable slips in one
-   command.
-2. One full case reviewed and signed off by one physician, to prove the review
-   process works before asking three people for twenty-six.
-3. A single session run end to end with real people, even if they are five
-   colleagues rather than students. Time it. Find out whether six minutes is
-   really six minutes, and whether handing back slips takes one minute or five.
+1. The chest pain card reviewed and signed off by one physician, to prove the
+   review process works before writing twenty-five more.
+2. A single session run end to end with real people, even if they are five
+   colleagues rather than students. Time it. Find out whether four minutes plus
+   the round-the-room is really six minutes, and whether the card carries a
+   facilitator who is not an emergency physician.
+3. The remaining cards drafted, once the shape has survived contact with a room.
 
 Step three is the one that will change your mind about something. Every teaching
 tool feels different in a room than it does on a laptop.

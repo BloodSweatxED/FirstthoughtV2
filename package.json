@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "score": "tsx src/cli/score-qualtrics.ts"
+    "score": "tsx src/cli/score-qualtrics.ts",
+    "card": "tsx src/cli/print-card.ts"
   },
   "dependencies": {
     "react": "^19.2.6",
