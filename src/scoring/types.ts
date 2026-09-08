@@ -1,3 +1,7 @@
+export type LearnerLevel = 'M1' | 'M2' | 'M3' | 'M4'
+
+export const ALL_LEVELS: LearnerLevel[] = ['M1', 'M2', 'M3', 'M4']
+
 export type DiagnosisCategory =
   | 'Cardiovascular'
   | 'Pulmonary'

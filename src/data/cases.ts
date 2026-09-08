@@ -1,4 +1,4 @@
-import type { DiagnosisCategory } from '../scoring/types'
+import type { DiagnosisCategory, LearnerLevel } from '../scoring/types'
 
 export type CaseInfoKey = 'demographics' | 'symptomDetails' | 'history' | 'medications' | 'riskFactors'
 
@@ -12,7 +12,11 @@ export type CaseInfoKey = 'demographics' | 'symptomDetails' | 'history' | 'medic
  * A one-line pearl does not do that.
  */
 export type FacilitationCard = {
-  /** The first thing the facilitator says once the timer stops. */
+  /**
+   * The first thing the facilitator says once the timer stops. Written to work
+   * at every level, since the amount of information differs but the discomfort
+   * of having too little does not.
+   */
   opening: string
   /** How to run the round of the room. */
   roundRobin: {
@@ -29,11 +33,26 @@ export type FacilitationCard = {
     whyItKills: string
     whatRaisesIt: string
   }[]
-  /** Questions to use when the room goes quiet. */
-  probes: string[]
-  /** The single most likely reasoning error on this case. */
-  commonTrap: string
-  /** The sixty second close. */
+  /**
+   * What changes with the amount of information the student was given.
+   *
+   * The dose of information is the design. An M1 who saw only age, sex, and the
+   * complaint cannot be held to the same expectations as an M4 who saw
+   * medications and risk factors, and the reasoning trap is different at each
+   * level. A card without this is wrong for three levels out of four.
+   */
+  byLevel: Record<
+    LearnerLevel,
+    {
+      /** What good looks like at this level, and what not to expect. */
+      emphasis: string
+      /** Probes that only make sense given what this level actually saw. */
+      probes: string[]
+      /** The reasoning error this particular dose of information invites. */
+      trap: string
+    }
+  >
+  /** The sixty second close. Shared across levels. */
   close: string
 }
 
@@ -42,6 +61,12 @@ export type TeachingCase = {
   label: string
   complaint: string
   learnerQuestion: string
+  /**
+   * Exactly what the student reads at each level, written out rather than
+   * assembled from parts. The wording of a low-information stem does most of
+   * the teaching, so it is reviewed and signed off as written.
+   */
+  stems: Record<LearnerLevel, string>
   info: Record<CaseInfoKey, string>
   expectedCategories: DiagnosisCategory[]
   /** Registry ids, not free text. A typo here is caught by cases.test.ts. */
@@ -68,6 +93,16 @@ export const teachingCases: TeachingCase[] = [
     label: 'Chest pain',
     complaint: 'A patient presents with chest pain.',
     learnerQuestion: 'What belongs on the first-pass differential?',
+    stems: {
+      M1:
+        '54-year-old man with chest pain.',
+      M2:
+        '54-year-old man with a history of GERD, presenting with chest pain.',
+      M3:
+        '54-year-old man with hypertension, type 2 diabetes, and GERD, presenting with 45 minutes of pressure-like chest discomfort radiating to the left shoulder, with diaphoresis.',
+      M4:
+        '54-year-old man with hypertension, type 2 diabetes, and GERD, presenting with 45 minutes of pressure-like chest discomfort radiating to the left shoulder, with diaphoresis. He takes metformin, lisinopril, and omeprazole. He smokes one pack a day. His father had a myocardial infarction at 58.',
+    },
     info: {
       demographics: '54-year-old man',
       symptomDetails:
@@ -94,7 +129,7 @@ export const teachingCases: TeachingCase[] = [
     ],
     card: {
       opening:
-        'Four minutes, chief complaint only. Nobody had enough information, and that was the point. Let us hear what you generated.',
+        'Four minutes, and less information than you wanted. Nobody in this room had enough, and that was the point. Let us hear what you generated.',
       roundRobin: {
         prompt:
           'Going around the room: give me one diagnosis from your list and one sentence on why you put it there. Not your best one, just the next one.',
@@ -138,13 +173,52 @@ export const teachingCases: TeachingCase[] = [
             'Severe pain immediately after forceful vomiting or retching, subcutaneous emphysema in the neck, recent endoscopy. Rare, and the one on this list students almost never say.',
         },
       ],
-      probes: [
-        'Several of you said GERD. What would have to be true for reflux to be the whole story in a 54 year old with these risk factors?',
-        'Nobody said dissection. What would you need to hear on history, or find on exam, to put it on the list?',
-        'Of everything on the board, which one can you least afford to be wrong about, and what is the single test that moves you?',
-      ],
-      commonTrap:
-        'Anchoring on the known GERD. This patient has a documented reflux diagnosis and is on omeprazole, so a comfortable benign explanation is sitting right there in the chart. The trap is letting a known chronic diagnosis account for an acute presentation. Name it explicitly if the room falls into it, because they will do it again on a real patient.',
+      byLevel: {
+        M1: {
+          emphasis:
+            'They were given an age, a sex, and three words. Reward breadth, not accuracy. A student who names six organ systems has done this task better than one who names ACS and stops. Do not expect esophageal rupture here. Name it yourself and say why it earns a place on the list.',
+          probes: [
+            'You knew this man was 54 and nothing else. What did the age alone do to your list, and would it have been a different list at 24?',
+            'What is the single question you would ask first, and which diagnoses would the answer let you drop?',
+            'Which one on the board would you least want to find out about tomorrow?',
+          ],
+          trap:
+            'Narrowing on almost no information. Watch for the student who names one diagnosis confidently and stops. At this level the failure mode is a short list, not a wrong list, and confidence is the warning sign rather than the goal.',
+        },
+        M2: {
+          emphasis:
+            'One piece of history has been added and it is a red herring on purpose. Spend the debrief on what that single line did to the room, not on the diagnoses themselves.',
+          probes: [
+            'Show of hands, honestly: whose list moved GERD up because it was in the stem?',
+            'What would reflux have to look like to account for chest pain in a 54 year old man?',
+            'Did anyone end up with a shorter list than they would have had without the GERD? Why is that the dangerous direction?',
+          ],
+          trap:
+            'This is the anchoring case. The reflux history is in the stem specifically to find out who lets a known chronic diagnosis explain an acute presentation. If the room takes the bait, say so plainly, because they will do exactly this on a real patient with a real chart.',
+        },
+        M3: {
+          emphasis:
+            'They now have enough to prioritize. Push for most likely and most dangerous as two separate lists, and for what test actually moves them.',
+          probes: [
+            'Give me your most likely and your most dangerous. If they are the same diagnosis, tell me why that is not just convenient.',
+            'Pressure, radiation to the shoulder, diaphoresis. Which part of that can you explain with reflux, and which part cannot you?',
+            'What is your first test, and what would a normal result genuinely rule out?',
+          ],
+          trap:
+            'Treating a textbook ACS description as a solved problem. The presentation fits so cleanly that dissection and pulmonary embolism quietly drop off the list, and both can present exactly like this. A story that fits well is the moment to check what else fits.',
+        },
+        M4: {
+          emphasis:
+            'Full frame. Expect a prioritized list with a first action attached. Ask about disposition and timing, not only diagnosis.',
+          probes: [
+            'You have everything. What do you actually do in the first ten minutes, before any result comes back?',
+            'His father had an MI at 58 and he smokes a pack a day. How much did that move you, and how much should it have?',
+            'The ECG is unremarkable and the first troponin is negative. What is your list now, and has anything left it?',
+          ],
+          trap:
+            'Letting risk factors do the reasoning. Risk factors shift pretest probability. They do not diagnose and they do not exclude. Patients with no risk factors still dissect their aortas, and this is the level where students start treating a risk factor list as an answer.',
+        },
+      },
       close:
         'The move that keeps patients alive is not picking the right answer in four minutes. It is making sure the lethal handful got named before you started narrowing. You are allowed to be wrong about which one it is. You cannot afford to have never considered it.',
     },
@@ -154,6 +228,16 @@ export const teachingCases: TeachingCase[] = [
     label: 'Shortness of breath',
     complaint: 'A patient presents with shortness of breath.',
     learnerQuestion: 'What systems could be causing this patient to feel dyspneic?',
+    stems: {
+      M1:
+        '68-year-old woman with shortness of breath.',
+      M2:
+        '68-year-old woman with a history of COPD, presenting with shortness of breath.',
+      M3:
+        '68-year-old woman with COPD, heart failure with preserved ejection fraction, and a recent knee replacement, presenting with two days of worsening dyspnea, pleuritic discomfort, and a mild cough.',
+      M4:
+        '68-year-old woman with COPD, heart failure with preserved ejection fraction, and a recent knee replacement, presenting with two days of worsening dyspnea, pleuritic discomfort, and a mild cough. She takes albuterol, tiotropium, and furosemide. Her apixaban was held for surgery. She is a former smoker with baseline exertional dyspnea and has been largely immobile since the operation.',
+    },
     info: {
       demographics: '68-year-old woman',
       symptomDetails: 'Worsening dyspnea for 2 days with pleuritic discomfort and mild cough.',
@@ -184,6 +268,16 @@ export const teachingCases: TeachingCase[] = [
     label: 'Abdominal pain',
     complaint: 'A patient presents with abdominal pain.',
     learnerQuestion: 'What dangerous and common diagnoses should be on the board early?',
+    stems: {
+      M1:
+        '27-year-old woman with abdominal pain.',
+      M2:
+        '27-year-old woman with a history of irritable bowel syndrome, presenting with abdominal pain.',
+      M3:
+        '27-year-old woman with no prior surgeries, presenting with sharp right lower quadrant pain since this morning, with nausea and one episode of vomiting. Her last menstrual period was seven weeks ago.',
+      M4:
+        '27-year-old woman with no prior surgeries, presenting with sharp right lower quadrant pain since this morning, with nausea and one episode of vomiting. Her last menstrual period was seven weeks ago. She takes a prenatal vitamin as needed and no anticoagulants. She is sexually active without reliable contraception and has no established prenatal care.',
+    },
     info: {
       demographics: '27-year-old woman',
       symptomDetails:
@@ -221,6 +315,16 @@ export const teachingCases: TeachingCase[] = [
     label: 'Headache',
     complaint: 'A patient presents with headache.',
     learnerQuestion: 'What makes this headache dangerous until proven otherwise?',
+    stems: {
+      M1:
+        '35-year-old man with a headache.',
+      M2:
+        '35-year-old man with a history of migraines, presenting with a headache.',
+      M3:
+        '35-year-old man with migraines in college and no recent trauma, presenting with an abrupt severe headache that began during exercise, reached maximum intensity within minutes, and was followed by vomiting.',
+      M4:
+        '35-year-old man with migraines in college and no recent trauma, presenting with an abrupt severe headache that began during exercise, reached maximum intensity within minutes, and was followed by vomiting. He takes no daily medications. There is a family history of aneurysm, and he uses cocaine occasionally.',
+    },
     info: {
       demographics: '35-year-old man',
       symptomDetails: 'Abrupt severe headache during exercise, maximal within minutes, with vomiting.',
@@ -244,6 +348,16 @@ export const teachingCases: TeachingCase[] = [
     label: 'Syncope',
     complaint: 'A patient presents after passing out.',
     learnerQuestion: 'Which diagnoses change disposition even if the patient now looks well?',
+    stems: {
+      M1:
+        '72-year-old man who passed out.',
+      M2:
+        '72-year-old man with a history of atrial fibrillation, who passed out.',
+      M3:
+        '72-year-old man with aortic stenosis, atrial fibrillation, and chronic kidney disease, who had a brief loss of consciousness while walking upstairs and is now alert with mild shortness of breath.',
+      M4:
+        '72-year-old man with aortic stenosis, atrial fibrillation, and chronic kidney disease, who had a brief loss of consciousness while walking upstairs and is now alert with mild shortness of breath. He takes metoprolol, warfarin, and torsemide. There was no prodrome, the episode was exertional, he is anticoagulated, and he lives alone.',
+    },
     info: {
       demographics: '72-year-old man',
       symptomDetails:

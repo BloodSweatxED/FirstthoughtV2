@@ -9,6 +9,7 @@
  */
 import { diagnosisName } from '../scoring/diagnoses'
 import { teachingCases } from '../data/cases'
+import { ALL_LEVELS, type LearnerLevel } from '../scoring/types'
 
 const WIDTH = 76
 
@@ -40,16 +41,21 @@ const wrap = (text: string, indent = 0, hang = 0) => {
 const rule = (label = '') =>
   label ? `${'-'.repeat(3)} ${label} ${'-'.repeat(Math.max(0, WIDTH - 5 - label.length))}` : '-'.repeat(WIDTH)
 
-const caseId = process.argv.slice(2).reduce<string | undefined>((found, token, index, all) => {
-  return token === '--case' ? all[index + 1] : found
-}, undefined)
+const argFor = (name: string) =>
+  process.argv.slice(2).reduce<string | undefined>((found, token, index, all) => {
+    return token === `--${name}` ? all[index + 1] : found
+  }, undefined)
+
+const caseId = argFor('case')
+const levelArg = argFor('level')
 
 if (!caseId) {
   console.log('\nCases:\n')
   teachingCases.forEach((item) => {
     console.log(`  ${item.id.padEnd(18)} ${item.card ? 'card written' : 'NEEDS A CARD'}`)
   })
-  console.log('\nRun with --case <id> to print one.\n')
+  console.log(`\nLevels: ${ALL_LEVELS.join(', ')}. Each prints a different card.`)
+  console.log('\nRun with --case <id> --level <M1|M2|M3|M4> to print one.\n')
   process.exit(0)
 }
 
@@ -65,10 +71,20 @@ if (!teachingCase.card) {
 
 const card = teachingCase.card
 
+const level = (levelArg ?? 'M1') as LearnerLevel
+if (!ALL_LEVELS.includes(level)) {
+  console.error(`\nUnknown level "${levelArg}". Use one of ${ALL_LEVELS.join(', ')}.\n`)
+  process.exit(1)
+}
+const forLevel = card.byLevel[level]
+
 console.log(`\n${'='.repeat(WIDTH)}`)
-console.log(`FIRST THOUGHT  ${teachingCase.label.toUpperCase()}`)
-console.log(`${teachingCase.complaint}`)
+console.log(`FIRST THOUGHT  ${teachingCase.label.toUpperCase()}  ${level}`)
 console.log('='.repeat(WIDTH))
+
+console.log(`\n${rule('WHAT THEY SAW')}`)
+console.log(wrap(teachingCase.stems[level]))
+console.log(`\n${wrap(teachingCase.learnerQuestion)}`)
 
 console.log(`\n${rule('OPEN')}`)
 console.log(wrap(card.opening))
@@ -84,11 +100,14 @@ card.cantMissNotes.forEach((note, index) => {
   console.log(wrap(`What raises it: ${note.whatRaisesIt}`, 3))
 })
 
-console.log(`\n${rule('IF THE ROOM GOES QUIET')}`)
-card.probes.forEach((probe) => console.log(wrap(`- ${probe}`, 0, 2)))
+console.log(`\n${rule(`WHAT GOOD LOOKS LIKE AT ${level}`)}`)
+console.log(wrap(forLevel.emphasis))
 
-console.log(`\n${rule('THE TRAP ON THIS CASE')}`)
-console.log(wrap(card.commonTrap))
+console.log(`\n${rule('IF THE ROOM GOES QUIET')}`)
+forLevel.probes.forEach((probe) => console.log(wrap(`- ${probe}`, 0, 2)))
+
+console.log(`\n${rule(`THE TRAP AT ${level}`)}`)
+console.log(wrap(forLevel.trap))
 
 console.log(`\n${rule('CLOSE (60 SECONDS)')}`)
 console.log(wrap(card.close))

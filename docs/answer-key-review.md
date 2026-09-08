@@ -11,6 +11,21 @@ The app tells an instructor, in front of a room, that the group missed a
 dangerous diagnosis. If the key is wrong, the app teaches the wrong thing and
 the pilot measures the wrong thing. The key is the intervention.
 
+## The stems need signing off word for word
+
+The amount of information a student gets is scaled to their level, and the exact
+wording of each stem is the design rather than a detail. An M1 sees an age, a
+sex, and the complaint. An M2 sees one added line of past history, and that line
+is usually a plausible chronic diagnosis chosen to invite anchoring. An M3 sees
+symptom detail and full history. An M4 sees medications and risk factors too.
+
+Print them with `npm run card -- --case <id> --level <M1|M2|M3|M4>`.
+
+Review each stem as written, not as a summary. Ask whether the M1 stem is
+genuinely answerable, whether the M2 history line is a fair red herring rather
+than a cheap trick, and whether anything in the M3 and M4 stems gives the answer
+away.
+
 ## The facilitation card is the thing to review hardest
 
 Nothing is displayed to the room during a session. The facilitator works from a
@@ -89,13 +104,18 @@ reporting in the pilot writeup.
 Both the diagnosis lists and the facilitation card need sign-off. A case is not
 usable in the pilot until both columns are signed.
 
-| Case | Card written | Keys signed | Card signed | Date | Changes made |
+| Case | Card written | Stems signed | Keys signed | Card signed | Date |
 | --- | --- | --- | --- | --- | --- |
 | Chest pain | yes | | | | |
 | Shortness of breath | no | | | | |
 | Abdominal pain | no | | | | |
 | Headache | no | | | | |
 | Syncope | no | | | | |
+
+Note for reviewers: the abdominal pain M2 stem currently uses a history of
+irritable bowel syndrome as its anchoring line, in a 27 year old woman whose
+real answer involves a seven week menstrual gap. Check that this is a fair
+teaching trap rather than a misleading one.
 
 ## Reviewers
 

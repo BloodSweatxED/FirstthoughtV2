@@ -4,8 +4,7 @@ import { infoLabels, teachingCases, type CaseInfoKey } from './data/cases'
 import { toCsv } from './export/csv'
 import { downloadCsv } from './export/download'
 import { scoreSubmission, summarizeRoom, type Submission } from './scoring/score'
-
-type LearnerLevel = 'M1' | 'M2' | 'M3' | 'M4'
+import type { LearnerLevel } from './scoring/types'
 
 type LevelConfig = {
   label: string
@@ -319,8 +318,8 @@ function App() {
 
       <section className="prompt-board">
         <div className="prompt-copy">
-          <p className="section-label">Cold open</p>
-          <h2>{teachingCase.complaint}</h2>
+          <p className="section-label">{activeLevel.shortLabel} stem, exactly as the student reads it</p>
+          <h2>{teachingCase.stems[level]}</h2>
           <p>{teachingCase.learnerQuestion}</p>
         </div>
         <div className="timer-card" aria-live="polite">

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DIAGNOSIS_BY_ID } from '../scoring/diagnoses'
+import { ALL_LEVELS } from '../scoring/types'
 import { parseResponse } from '../scoring/match'
 import { teachingCases } from './cases'
 
@@ -93,15 +94,36 @@ describe('facilitation cards', () => {
     })
   })
 
-  it('gives the facilitator at least two probes for a quiet room', () => {
+  it('covers all four learner levels', () => {
     withCards.forEach((teachingCase) => {
-      expect(teachingCase.card!.probes.length).toBeGreaterThanOrEqual(2)
+      ALL_LEVELS.forEach((level) => {
+        expect(teachingCase.card!.byLevel[level]).toBeDefined()
+      })
     })
   })
 
-  it('names a common trap and a close', () => {
+  it('gives each level its own emphasis, probes, and trap', () => {
     withCards.forEach((teachingCase) => {
-      expect(teachingCase.card!.commonTrap.length).toBeGreaterThan(40)
+      ALL_LEVELS.forEach((level) => {
+        const entry = teachingCase.card!.byLevel[level]
+        expect(entry.emphasis.length).toBeGreaterThan(40)
+        expect(entry.probes.length).toBeGreaterThanOrEqual(2)
+        expect(entry.trap.length).toBeGreaterThan(40)
+      })
+    })
+  })
+
+  // The trap is what the dose of information invites. If two levels share one,
+  // the card has not actually been written for both of them.
+  it('does not reuse the same trap across levels', () => {
+    withCards.forEach((teachingCase) => {
+      const traps = ALL_LEVELS.map((level) => teachingCase.card!.byLevel[level].trap)
+      expect(new Set(traps).size).toBe(ALL_LEVELS.length)
+    })
+  })
+
+  it('names a close', () => {
+    withCards.forEach((teachingCase) => {
       expect(teachingCase.card!.close.length).toBeGreaterThan(40)
     })
   })
@@ -115,5 +137,46 @@ describe('facilitation cards', () => {
       console.log(`\n  Cases still needing a facilitation card: ${missing.join(', ')}\n`)
     }
     expect(Array.isArray(missing)).toBe(true)
+  })
+})
+
+describe('level stems', () => {
+  it('gives every case a stem at every level', () => {
+    teachingCases.forEach((teachingCase) => {
+      ALL_LEVELS.forEach((level) => {
+        expect(teachingCase.stems[level].length).toBeGreaterThan(10)
+      })
+    })
+  })
+
+  // The dose of information is the design. If a later level does not say more
+  // than an earlier one, the ladder is broken for that case.
+  it('gives strictly more information at each step up the ladder', () => {
+    teachingCases.forEach((teachingCase) => {
+      const lengths = ALL_LEVELS.map((level) => teachingCase.stems[level].length)
+      for (let i = 1; i < lengths.length; i += 1) {
+        expect(lengths[i]).toBeGreaterThan(lengths[i - 1])
+      }
+    })
+  })
+
+  it('starts every case with age, sex, and the complaint alone', () => {
+    teachingCases.forEach((teachingCase) => {
+      expect(teachingCase.stems.M1).toMatch(/\d+-year-old/)
+      // No history, medications, or risk factors at M1.
+      expect(teachingCase.stems.M1.toLowerCase()).not.toContain('history of')
+      expect(teachingCase.stems.M1.length).toBeLessThan(60)
+    })
+  })
+
+  // M2 adds one line of past history, and by design it is usually a plausible
+  // chronic diagnosis that invites anchoring. The test checks that history was
+  // added at all, not the exact phrasing.
+  it('adds past history at M2', () => {
+    const markers = ['history of', 'known', 'prior', 'diagnosed with']
+    teachingCases.forEach((teachingCase) => {
+      const stem = teachingCase.stems.M2.toLowerCase()
+      expect(markers.some((marker) => stem.includes(marker))).toBe(true)
+    })
   })
 })

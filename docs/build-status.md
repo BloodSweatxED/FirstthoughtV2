@@ -73,10 +73,18 @@ This is the part to read carefully.
 has to be designed once and reused for every session, including how the study ID
 is captured and how the case is identified.
 
-**2. Twenty-one more facilitation cards.** This is the critical path.
+**2. Twenty-one more facilitation cards, each written four times.** This is the
+critical path, and it is four times the work it looks like.
 
-Nothing is displayed in the classroom, so the card is the intervention. One
-card exists, for chest pain. Print it with `npm run card -- --case chest-pain`.
+Nothing is displayed in the classroom, so the card is the intervention. The
+amount of information a student receives is scaled to their level, which means
+the stem, what counts as a good answer, the probes, and the reasoning trap all
+differ between M1 and M4. A level-agnostic card is wrong for three levels out of
+four. The chest pain card names anchoring on a known reflux history as its trap,
+and an M1 student never sees that history at all.
+
+One card exists, for chest pain, written across all four levels. Print it with
+`npm run card -- --case chest-pain --level M2`.
 
 Each card carries the opening line, the round-the-room prompt and what to do
 when a student says "same as theirs", one lethality line and one recognition
