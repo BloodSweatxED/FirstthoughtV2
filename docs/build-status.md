@@ -20,13 +20,14 @@ differential. They work alone. They are not told what a good answer looks like
 and the app shows them nothing while the timer runs. This is the part that does
 the teaching.
 
-**Minute 4.** The facilitator pulls the responses into the app and the aggregate
-appears: how many of the group named each dangerous diagnosis, which organ
-systems nobody mentioned, and anything the tool could not recognise.
+**Minutes 4 to 6.** The facilitator debriefs from a printed answer key. Nothing
+is displayed to the room and no software runs in the classroom. The instruction
+is to talk about the misses, not the hits.
 
-**Minutes 4 to 6.** The facilitator debriefs from what is on screen. The app
-supplies one teaching pearl. The instruction is to talk about the misses, not
-the hits.
+**The following week, minute 0.** Each student gets a paper slip back, labelled
+with their study number and nothing else, showing what they named and what they
+missed on the previous case. This is the part that does most of the teaching, so
+it is not optional.
 
 Nothing is graded. No student's name appears anywhere.
 
@@ -72,16 +73,23 @@ This is the part to read carefully.
 has to be designed once and reused for every session, including how the study ID
 is captured and how the case is identified.
 
-**2. A live path from Qualtrics into the display.** This is the largest
-functional gap and it is on the critical path for January. Right now the app can
-only be fed by typing responses in by hand. In an actual session the facilitator
-needs to get 6 phone submissions onto the screen in about fifteen seconds.
+**2. Printable individual feedback slips.** This is now the largest functional
+gap and the one thing on the critical path for January.
 
-The realistic answer is a paste box: the facilitator copies the response column
-out of Qualtrics and pastes it into the app, which splits and scores it. A live
-API connection is not workable because it would require putting a Qualtrics
-token in a web page. **Until the paste path is built, the app cannot be run in a
-real classroom.**
+The design no longer displays anything in the classroom, which removes all
+technical risk from the session itself. In exchange, the entire teaching value
+now rests on returning each student a slip the following week showing what they
+personally missed. The scoring engine already produces exactly that data. What
+does not exist is a way to turn one Qualtrics export into 6 printable slips
+labelled by study number, ready to hand out.
+
+This has to be genuinely one command, because it will run about 220 times across
+the block. If it takes ten minutes of fiddling per group per week, it will not
+happen by March.
+
+A live in-room display was considered and dropped. It would require a server, a
+security review, and a maintainer, and it would put a point of failure in front
+of 22 facilitators twenty times each.
 
 **3. Twenty-one more cases.** Five exist. Sixteen to twenty sessions with no
 repeats, plus spares, plus cases held back for the baseline task and the OSCE
@@ -115,12 +123,13 @@ twenty sessions means something will fail at some point.
 
 In order:
 
-1. The paste path built, so the tool can actually be demonstrated running.
+1. Slip generation built, so one export becomes six printable slips in one
+   command.
 2. One full case reviewed and signed off by one physician, to prove the review
    process works before asking three people for twenty-six.
 3. A single session run end to end with real people, even if they are five
    colleagues rather than students. Time it. Find out whether six minutes is
-   really six minutes.
+   really six minutes, and whether handing back slips takes one minute or five.
 
 Step three is the one that will change your mind about something. Every teaching
 tool feels different in a room than it does on a laptop.
