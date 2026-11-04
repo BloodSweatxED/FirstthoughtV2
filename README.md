@@ -21,6 +21,21 @@ The demo is intentionally browser-only:
 - no external model calls
 - formative use only
 
+## How matching works
+
+Learner answers are matched against a curated diagnosis dictionary in `src/data/diagnoses.ts`.
+Matching uses whole words, and longer phrases win, so "migraine" never counts as MI and "cervical artery dissection" never counts as aortic dissection.
+Text the dictionary does not recognize shows up as "?" on the whiteboard so faculty can see it and the dictionary can grow.
+
+Answer keys in `src/data/cases.ts` are level-aware. Each level reveals more of the case, so can't-miss, most likely, and also-consider lists change with it.
+The keys are a first draft and need faculty clinical review.
+
+## Tests
+
+```bash
+npm test
+```
+
 ## Local Development
 
 ```bash
