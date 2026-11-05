@@ -12,15 +12,15 @@ export function Whiteboard({ responses }: { responses: ResponseEntry[] }) {
         </div>
       </div>
       {responses.length === 0 ? (
-        <div className="empty-state">Add a response or sample to populate the room-level differential.</div>
+        <div className="empty-state">No answers yet.</div>
       ) : (
         <div className="response-list">
-          {responses.map((response) => {
+          {responses.map((response, index) => {
             const { matched, unrecognized } = matchDiagnoses(response.text)
             return (
               <article key={response.id} className="response-card">
                 <div>
-                  <strong>{response.learnerId}</strong>
+                  <strong>Learner {index + 1}</strong>
                 </div>
                 <p>{response.text}</p>
                 <div className="chip-list read-as">
