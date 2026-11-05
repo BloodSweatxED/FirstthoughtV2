@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "export:keys": "vite-node scripts/export-answer-keys.ts"
   },
   "dependencies": {
     "react": "^19.2.6",
