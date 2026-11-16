@@ -8,6 +8,9 @@ export type RoundResponses = {
   responses: ResponseEntry[]
 }
 
+/** One stored answer with its round, for the host's session recap and export. */
+export type SessionResponse = ResponseEntry & { roundId: string; caseId: string; level: LearnerLevel }
+
 export type SubmitInput = {
   code: string
   roundId: string
@@ -26,4 +29,6 @@ export interface Backend {
   getResponses(input: { code: string; roundId: string; learnerId?: string; hostKey?: string }): Promise<RoundResponses>
   submit(input: SubmitInput): Promise<void>
   updateRoom(input: { code: string; hostKey: string; patch: RoomPatch }): Promise<RoomRecord>
+  /** Host only. Every answer the room has collected, optionally from an ISO time onward. */
+  getHistory(input: { code: string; hostKey: string; since?: string }): Promise<SessionResponse[]>
 }

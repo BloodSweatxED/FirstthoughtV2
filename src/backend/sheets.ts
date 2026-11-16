@@ -1,4 +1,4 @@
-import type { Backend } from './types'
+import type { Backend, SessionResponse } from './types'
 
 /**
  * Google Sheets backend via an Apps Script web app (see apps-script/Code.gs and docs/sheets-setup.md).
@@ -50,5 +50,12 @@ export const createSheetsBackend = (url: string): Backend => {
     },
     updateRoom: async (input) =>
       (await call<{ room: Awaited<ReturnType<Backend['updateRoom']>> }>({ action: 'updateRoom', ...input }, 'POST')).room,
+    getHistory: async (input) =>
+      (
+        await call<{ responses: SessionResponse[] }>(
+          Object.fromEntries(Object.entries({ action: 'getHistory', ...input }).filter(([, value]) => value !== undefined)),
+          'POST',
+        )
+      ).responses,
   }
 }

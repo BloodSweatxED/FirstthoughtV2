@@ -3,6 +3,7 @@ import { parseRoute } from './app/routes'
 import { HomePage } from './pages/HomePage'
 import { HostPage } from './pages/HostPage'
 import { PosterPage } from './pages/PosterPage'
+import { RecapPage } from './pages/RecapPage'
 import { StudentPage } from './pages/StudentPage'
 
 function App() {
@@ -14,6 +15,8 @@ function App() {
       return <HostPage code={route.code} />
     case 'poster':
       return <PosterPage code={route.code} />
+    case 'recap':
+      return <RecapPage code={route.code} />
     default:
       return <HomePage />
   }

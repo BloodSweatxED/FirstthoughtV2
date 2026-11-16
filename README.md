@@ -13,12 +13,13 @@ The amount of case information scales by learner level:
 
 The intent is formative practice, not grading.
 
-## Two ways a room runs
+## How a room runs
 
 Each room has a permanent QR code. You can print it from the room's poster page and put it up in the classroom.
 
 - **Self-run (no instructor).** The room serves a case of the day at the room's default level. Each learner gets their own 4 minutes and sees the room's answers right after submitting.
-- **Instructor-led.** The host starts a 4-minute round with a chosen case and level. Answers stay hidden from everyone until the host clicks Reveal. A led round that nobody ends goes back to self-run after 90 minutes.
+- **Held for a session.** The host clicks "Hold room for a session" before learners arrive. Anyone who scans the code waits for the first round instead of starting today's case alone.
+- **Instructor-led.** The host starts a 4-minute round with a chosen case and level. Answers stay hidden from everyone until the host clicks Reveal. The reveal closes the round, so nobody can answer after seeing the room. A led round that nobody ends goes back to self-run after 90 minutes.
 
 ## Pages
 
@@ -26,6 +27,11 @@ Each room has a permanent QR code. You can print it from the room's poster page 
 - `/r/CODE`: learner view, for phones
 - `/r/CODE/host`: host view, for the projector. Needs the room's host key. Use "Copy host link" to share it with a co-instructor.
 - `/r/CODE/poster`: printable QR poster
+- `/r/CODE/recap`: session recap for the host. Shows each round, what the room caught against what the typical learner caught, and a CSV export.
+
+The host view has a **Present** button. It goes full screen and hides everything except the case, the QR code, the round buttons, and the debrief. Use it when you project or screen record.
+
+After a reveal, the host view leads with **most likely vs. most dangerous**: how many learners named each diagnosis on both lists, and which can't-miss diagnoses nobody named.
 
 ## Data and privacy
 
@@ -55,7 +61,13 @@ The keys are a first draft and need faculty clinical review.
 npm test
 ```
 
-The tests cover the matcher, the answer keys, the room rules, and `apps-script/Code.gs` running against a fake Sheet.
+The tests cover the matcher, the answer keys, the room rules, the session recap, and `apps-script/Code.gs` running against a fake Sheet.
+
+## Running a session
+
+- [docs/roadmap.md](docs/roadmap.md): what is done and what is left before the December pitch.
+- [docs/session-runbook.md](docs/session-runbook.md): how to run and film a live session.
+- [docs/pitch-video.md](docs/pitch-video.md): the storyboard for the pitch video.
 
 ## Local Development
 

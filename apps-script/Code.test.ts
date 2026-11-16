@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { localDate } from '../src/domain/rounds'
+
+// Code.gs reads the real clock, so open rounds in these tests use today's date.
+const OPEN_M1 = `open-${localDate(new Date())}-M1`
 
 /** Runs the real Code.gs against an in-memory fake of the Sheets APIs it uses. */
 const loadScript = () => {
@@ -64,7 +68,7 @@ describe('Apps Script backend', () => {
     const { code } = created.room
     expect(get({ action: 'getRoom', code }).room).not.toHaveProperty('hostKey')
 
-    const base = { action: 'submit', code, roundId: 'open-2026-12-01-M1', caseId: 'chest-pain', level: 'M1' }
+    const base = { action: 'submit', code, roundId: OPEN_M1, caseId: 'chest-pain', level: 'M1' }
     expect(post({ ...base, learnerId: 'a', text: 'PE, MI' }).ok).toBe(true)
     expect(get({ action: 'getResponses', code, roundId: base.roundId, learnerId: 'b' })).toMatchObject({ visible: false, count: 1 })
     expect(post({ ...base, learnerId: 'a', text: 'again' })).toMatchObject({ ok: false, error: /Already/ })
@@ -86,15 +90,57 @@ describe('Apps Script backend', () => {
     expect(post({ action: 'updateRoom', code, hostKey, patch }).room).toMatchObject({ mode: 'led', revealed: false, level: 'M4' })
     post({ action: 'submit', code, roundId: 'led-1', learnerId: 'a', caseId: 'syncope', level: 'M4', text: 'arrhythmia' })
     expect(get({ action: 'getResponses', code, roundId: 'led-1', learnerId: 'a' }).visible).toBe(false)
+    expect(post({ action: 'submit', code, roundId: 'led-other', learnerId: 'b', caseId: 'syncope', level: 'M4', text: 'PE' })).toMatchObject({ ok: false, error: /no longer open/ })
     post({ action: 'updateRoom', code, hostKey, patch: { revealed: true } })
     expect(get({ action: 'getRoom', code }).room.revealed).toBe(true)
     expect(get({ action: 'getResponses', code, roundId: 'led-1' }).visible).toBe(true)
+    expect(post({ action: 'submit', code, roundId: 'led-1', learnerId: 'c', caseId: 'syncope', level: 'M4', text: 'PE' })).toMatchObject({ ok: false, error: /already revealed/ })
+  })
+
+  it('rejects rounds the room is not serving and records the room’s own case and level', () => {
+    const { post, sheets } = loadScript()
+    const { room, hostKey } = post({ action: 'createRoom', label: 'BAP', level: 'M1' })
+    const code = room.code
+    const base = { action: 'submit', code, caseId: 'chest-pain', level: 'M1', text: 'PE' }
+    expect(post({ ...base, roundId: 'open-x', learnerId: 'a' })).toMatchObject({ ok: false, error: /no longer open/ })
+    expect(post({ ...base, roundId: 'open-2020-01-01-M1', learnerId: 'a' })).toMatchObject({ ok: false, error: /no longer open/ })
+    expect(post({ ...base, roundId: OPEN_M1.replace(/M1$/, 'M3'), learnerId: 'a' })).toMatchObject({ ok: false, error: /no longer open/ })
+    expect(post({ ...base, roundId: 'led-1', learnerId: 'a' })).toMatchObject({ ok: false, error: /no longer open/ })
+
+    const patch = { mode: 'led', caseId: 'syncope', level: 'M4', roundId: 'led-1', roundStartedAt: new Date().toISOString(), revealed: false }
+    post({ action: 'updateRoom', code, hostKey, patch })
+    expect(post({ ...base, roundId: 'led-1', learnerId: 'a' }).ok).toBe(true)
+    const stored = sheets.get('responses')!.at(-1)!
+    expect(stored.slice(5, 7)).toEqual(['syncope', 'M4'])
+  })
+
+  it('passes the lobby through and takes no answers while the room is held', () => {
+    const { get, post } = loadScript()
+    const { room, hostKey } = post({ action: 'createRoom', label: 'BAP', level: 'M1' })
+    const code = room.code
+    post({ action: 'updateRoom', code, hostKey, patch: { mode: 'lobby', roundId: '', roundStartedAt: new Date().toISOString(), revealed: false } })
+    expect(get({ action: 'getRoom', code }).room.mode).toBe('lobby')
+    expect(post({ action: 'submit', code, roundId: 'lobby', learnerId: 'a', caseId: 'chest-pain', level: 'M1', text: 'PE' })).toMatchObject({ ok: false, error: /no longer open/ })
+    post({ action: 'updateRoom', code, hostKey, patch: { mode: 'something-else' } })
+    expect(get({ action: 'getRoom', code }).room.mode).toBe('open')
+  })
+
+  it('returns the room history to the host only', () => {
+    const { post } = loadScript()
+    const { room, hostKey } = post({ action: 'createRoom', label: 'BAP', level: 'M1' })
+    const code = room.code
+    post({ action: 'submit', code, roundId: OPEN_M1, learnerId: 'a', caseId: 'chest-pain', level: 'M1', text: 'PE, MI' })
+    expect(post({ action: 'getHistory', code, hostKey: 'nope' })).toMatchObject({ ok: false, error: /authorized/ })
+    const history = post({ action: 'getHistory', code, hostKey })
+    expect(history.responses).toHaveLength(1)
+    expect(history.responses[0]).toMatchObject({ roundId: OPEN_M1, caseId: 'chest-pain', level: 'M1', text: 'PE, MI' })
+    expect(post({ action: 'getHistory', code, hostKey, since: '2999-01-01T00:00:00.000Z' }).responses).toEqual([])
   })
 
   it('neutralizes formula-looking answers and rejects unknown actions', () => {
     const { get, post, rawAppends } = loadScript()
     const { room } = post({ action: 'createRoom', label: 'BAP', level: 'M1' })
-    post({ action: 'submit', code: room.code, roundId: 'open-x', learnerId: 'a', caseId: 'x', level: 'M1', text: '=IMPORTXML("http://x")' })
+    post({ action: 'submit', code: room.code, roundId: OPEN_M1, learnerId: 'a', caseId: 'x', level: 'M1', text: '=IMPORTXML("http://x")' })
     expect(rawAppends.at(-1)!.at(-1)).toBe(`'=IMPORTXML("http://x")`)
     expect(get({ action: 'dropTables' })).toMatchObject({ ok: false, error: 'Unknown action' })
   })

@@ -1,20 +1,23 @@
 import { teachingCases } from '../data/cases'
 import {
   canSeeResponses,
+  isOpenRound,
+  ledRoundActive,
   MAX_RESPONSE_LENGTH,
+  openRoundValid,
   ROUND_SECONDS,
   type RoomPatch,
   type RoomRecord,
 } from '../domain/rounds'
-import type { LearnerLevel, ResponseEntry } from '../domain/types'
-import type { RoundResponses, SubmitInput } from './types'
+import type { LearnerLevel } from '../domain/types'
+import type { RoundResponses, SessionResponse, SubmitInput } from './types'
 
 /**
  * Storage-agnostic room logic over a plain object.
  * The local backend runs this directly. apps-script/Code.gs is a line-for-line port; keep them in sync.
  */
 export type StoredRoom = RoomRecord & { hostKey: string; createdAt: string }
-export type StoredResponse = ResponseEntry & { code: string; roundId: string; caseId: string; level: LearnerLevel }
+export type StoredResponse = SessionResponse & { code: string }
 export type Db = { rooms: StoredRoom[]; responses: StoredResponse[] }
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ'
@@ -110,6 +113,16 @@ export const submit = (db: Db, input: SubmitInput, now: Date = new Date(), id: s
   if (!text) throw new Error('Empty answer')
   if (text.length > MAX_RESPONSE_LENGTH) throw new Error(`Answers are limited to ${MAX_RESPONSE_LENGTH} characters`)
   if (!input.roundId || !input.learnerId) throw new Error('Missing round or learner')
+
+  // The server decides which rounds are live. It does not trust the round the client names.
+  let caseId = input.caseId
+  if (isOpenRound(input.roundId)) {
+    if (!openRoundValid(input.roundId, room.level, now)) throw new Error('This round is no longer open')
+  } else {
+    if (!ledRoundActive(publicRoom(room), now) || room.roundId !== input.roundId) throw new Error('This round is no longer open')
+    if (room.revealed) throw new Error('Answers were already revealed for this round')
+    caseId = room.caseId
+  }
   if (db.responses.some((item) => item.code === room.code && item.roundId === input.roundId && item.learnerId === input.learnerId)) {
     throw new Error('Already submitted for this round')
   }
@@ -118,8 +131,8 @@ export const submit = (db: Db, input: SubmitInput, now: Date = new Date(), id: s
     code: room.code,
     roundId: input.roundId,
     learnerId: input.learnerId,
-    caseId: input.caseId,
-    level: input.level,
+    caseId,
+    level: room.level,
     text,
     createdAt: now.toISOString(),
   })
@@ -136,4 +149,12 @@ export const updateRoom = (db: Db, input: { code: string; hostKey: string; patch
   }
   room.updatedAt = now.toISOString()
   return publicRoom(room)
+}
+
+export const getHistory = (db: Db, input: { code: string; hostKey: string; since?: string }): SessionResponse[] => {
+  const room = requireRoom(db, input.code)
+  if (room.hostKey !== input.hostKey) throw new Error('Not authorized for this room')
+  return db.responses
+    .filter((item) => item.code === room.code && (!input.since || item.createdAt >= input.since))
+    .map(({ id, learnerId, text, createdAt, roundId, caseId, level }) => ({ id, learnerId, text, createdAt, roundId, caseId, level }))
 }

@@ -468,7 +468,7 @@ export const diagnoses: Diagnosis[] = [
     id: 'chest-wall',
     name: 'Chest wall / musculoskeletal pain',
     categories: ['Musculoskeletal'],
-    synonyms: ['costochondritis', 'chest wall pain', 'msk', 'musculoskeletal', 'musculoskeletal pain', 'muscle strain', 'strain', 'rib fracture', 'tietze'],
+    synonyms: ['costochondritis', 'chest wall pain', 'msk', 'musculoskeletal', 'musculoskeletal pain', 'muscle strain', 'pulled muscle', 'strain', 'rib fracture', 'broken rib', 'fractured rib', 'tietze'],
   },
 
   // Toxicologic

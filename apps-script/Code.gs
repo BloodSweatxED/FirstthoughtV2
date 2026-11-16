@@ -16,6 +16,8 @@ var CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ';
 var MAX_RESPONSE_LENGTH = 600;
 var DEFAULT_CASE_ID = 'chest-pain';
 var ROUND_SECONDS = 240;
+var LED_ROUND_TTL_MS = 90 * 60 * 1000;
+var OPEN_ROUND_SKEW_MS = 36 * 60 * 60 * 1000;
 
 function doGet(e) {
   return respond_((e && e.parameter) || {});
@@ -50,6 +52,8 @@ function route_(req) {
       return { valid: Boolean(room && req.hostKey && room.hostKey === String(req.hostKey)) };
     case 'getResponses':
       return getResponses_(req);
+    case 'getHistory':
+      return getHistory_(req);
     case 'createRoom':
       return withLock_(function () { return createRoom_(req); });
     case 'submit':
@@ -68,7 +72,7 @@ function publicRoom_(room) {
     code: room.code,
     label: room.label,
     level: room.level,
-    mode: room.mode === 'led' ? 'led' : 'open',
+    mode: room.mode === 'led' || room.mode === 'lobby' ? room.mode : 'open',
     caseId: room.caseId,
     roundId: room.roundId,
     roundStartedAt: room.roundStartedAt,
@@ -111,6 +115,18 @@ function createRoom_(req) {
   return { room: publicRoom_(room), hostKey: room.hostKey };
 }
 
+function ledRoundActive_(pub, now) {
+  return pub.mode === 'led' && Boolean(pub.roundStartedAt) && now.getTime() - Date.parse(pub.roundStartedAt) < LED_ROUND_TTL_MS;
+}
+
+/** Today's open round at the room's level. A learner's date can differ from the server's by a time zone. */
+function openRoundValid_(roundId, level, now) {
+  var match = /^open-(\d{4})-(\d{2})-(\d{2})-(M[1-4])$/.exec(roundId);
+  if (!match || match[4] !== level) return false;
+  var noon = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return Math.abs(now.getTime() - noon) <= OPEN_ROUND_SKEW_MS;
+}
+
 function getResponses_(req) {
   var room = findRoom_(req.code);
   if (!room) throw new Error('Room not found');
@@ -144,20 +160,48 @@ function submit_(req) {
   if (!text) throw new Error('Empty answer');
   if (text.length > MAX_RESPONSE_LENGTH) throw new Error('Answers are limited to ' + MAX_RESPONSE_LENGTH + ' characters');
   if (!req.roundId || !req.learnerId) throw new Error('Missing round or learner');
+
+  // The server decides which rounds are live. It does not trust the round the client names.
+  var roundId = String(req.roundId);
+  var pub = publicRoom_(room);
+  var now = new Date();
+  var caseId = String(req.caseId || '');
+  if (roundId.indexOf('open-') === 0) {
+    if (!openRoundValid_(roundId, pub.level, now)) throw new Error('This round is no longer open');
+  } else {
+    if (!ledRoundActive_(pub, now) || pub.roundId !== roundId) throw new Error('This round is no longer open');
+    if (pub.revealed) throw new Error('Answers were already revealed for this round');
+    caseId = pub.caseId;
+  }
   var duplicate = readRows_(RESPONSE_COLUMNS, 'responses').some(function (item) {
-    return item.code === room.code && item.roundId === String(req.roundId) && item.learnerId === String(req.learnerId);
+    return item.code === room.code && item.roundId === roundId && item.learnerId === String(req.learnerId);
   });
   if (duplicate) throw new Error('Already submitted for this round');
   appendRow_('responses', RESPONSE_COLUMNS, {
     id: Utilities.getUuid(),
-    createdAt: new Date().toISOString(),
+    createdAt: now.toISOString(),
     code: room.code,
-    roundId: String(req.roundId),
+    roundId: roundId,
     learnerId: String(req.learnerId),
-    caseId: String(req.caseId || ''),
-    level: String(req.level || ''),
+    caseId: caseId,
+    level: pub.level,
     text: text
   });
+}
+
+/** Host only. Every answer the room has collected, optionally from an ISO time onward. */
+function getHistory_(req) {
+  var room = findRoom_(req.code);
+  if (!room) throw new Error('Room not found');
+  if (!req.hostKey || String(req.hostKey) !== room.hostKey) throw new Error('Not authorized for this room');
+  var since = String(req.since || '');
+  return {
+    responses: readRows_(RESPONSE_COLUMNS, 'responses')
+      .filter(function (item) { return item.code === room.code && (!since || item.createdAt >= since); })
+      .map(function (item) {
+        return { id: item.id, learnerId: item.learnerId, text: item.text, createdAt: item.createdAt, roundId: item.roundId, caseId: item.caseId, level: item.level };
+      })
+  };
 }
 
 function updateRoom_(req) {

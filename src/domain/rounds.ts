@@ -8,8 +8,10 @@ import type { LearnerLevel } from './types'
  *   Each learner sees the room's answers right after submitting.
  * - "led" mode is an instructor-run round. Answers stay hidden until the instructor reveals them.
  *   A led round that nobody closes falls back to open mode after LED_ROUND_TTL_MS.
+ * - "lobby" mode holds the room before an instructor-run session. Learners who join see a waiting screen
+ *   instead of the case of the day, so nobody starts early. It falls back to open mode the same way.
  */
-export type RoomMode = 'open' | 'led'
+export type RoomMode = 'open' | 'led' | 'lobby'
 
 export type RoomRecord = {
   code: string
@@ -61,12 +63,37 @@ export const caseOfTheDay = (roomCode: string, date: string) =>
 
 export const isOpenRound = (roundId: string) => roundId.startsWith('open-')
 
+const OPEN_ROUND_PATTERN = /^open-(\d{4})-(\d{2})-(\d{2})-(M[1-4])$/
+/** A learner's calendar date can differ from the server's by a time zone, so allow a day and a half either way. */
+const OPEN_ROUND_SKEW_MS = 36 * 60 * 60 * 1000
+
+/**
+ * Whether an open round id is one the room could be serving right now: today's date, at the room's level.
+ * The Apps Script backend mirrors this rule; keep them in sync.
+ */
+export const openRoundValid = (roundId: string, level: LearnerLevel, now: Date) => {
+  const match = OPEN_ROUND_PATTERN.exec(roundId)
+  if (!match || match[4] !== level) return false
+  const noon = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12)
+  return Math.abs(now.getTime() - noon) <= OPEN_ROUND_SKEW_MS
+}
+
 export const ledRoundActive = (room: RoomRecord, now: Date) =>
   room.mode === 'led' &&
   Boolean(room.roundStartedAt) &&
   now.getTime() - Date.parse(room.roundStartedAt) < LED_ROUND_TTL_MS
 
+export const lobbyActive = (room: RoomRecord, now: Date) =>
+  room.mode === 'lobby' &&
+  Boolean(room.roundStartedAt) &&
+  now.getTime() - Date.parse(room.roundStartedAt) < LED_ROUND_TTL_MS
+
+export const LOBBY_ROUND_ID = 'lobby'
+
 export const resolveRound = (room: RoomRecord, now: Date = new Date()): ActiveRound => {
+  if (lobbyActive(room, now)) {
+    return { roundId: LOBBY_ROUND_ID, caseId: room.caseId, level: room.level, mode: 'lobby', endsAt: null, revealed: false }
+  }
   if (ledRoundActive(room, now)) {
     return {
       roundId: room.roundId,
@@ -95,6 +122,14 @@ export const startLedRound = (caseId: string, level: LearnerLevel, now: Date = n
   roundId: `led-${now.getTime().toString(36)}`,
   roundStartedAt: now.toISOString(),
   roundSeconds: ROUND_SECONDS,
+  revealed: false,
+})
+
+/** Hold the room for a session. Nothing can be answered until the instructor starts a round. */
+export const openLobby = (now: Date = new Date()): RoomPatch => ({
+  mode: 'lobby',
+  roundId: '',
+  roundStartedAt: now.toISOString(),
   revealed: false,
 })
 

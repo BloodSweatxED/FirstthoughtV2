@@ -33,6 +33,17 @@ export const learnerIdFor = (code: string, roundId: string) => {
 export const savedAnswer = (code: string, roundId: string) => read(`ft-answer:${code}:${roundId}`)
 export const saveAnswer = (code: string, roundId: string, text: string) => write(`ft-answer:${code}:${roundId}`, text)
 
+/** When this device opened a self-run case, so the four-minute clock survives a reload. */
+export const openedAtFor = (code: string, roundId: string) => {
+  const value = Number(read(`ft-opened:${code}:${roundId}`))
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+export const saveOpenedAt = (code: string, roundId: string, time: number) => write(`ft-opened:${code}:${roundId}`, String(time))
+
+/** The unsent answer, so a reload or a locked phone does not lose typing. */
+export const savedDraft = (code: string, roundId: string) => read(`ft-draft:${code}:${roundId}`) ?? ''
+export const saveDraft = (code: string, roundId: string, text: string) => write(`ft-draft:${code}:${roundId}`, text)
+
 const HOST_KEYS = 'ft-host-keys'
 const hostKeys = (): Record<string, string> => {
   try {

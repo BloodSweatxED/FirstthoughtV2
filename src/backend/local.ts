@@ -45,4 +45,5 @@ export const localBackend: Backend = {
   getResponses: (input) => withDb((db) => core.getResponses(db, input)),
   submit: (input) => withDb((db) => core.submit(db, input), true),
   updateRoom: (input) => withDb((db) => core.updateRoom(db, input), true),
+  getHistory: (input) => withDb((db) => core.getHistory(db, input)),
 }

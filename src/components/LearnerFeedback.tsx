@@ -4,7 +4,8 @@ import { diagnosisById } from '../data/diagnoses'
 import type { ResponseEntry } from '../domain/types'
 
 type Props = {
-  ownText: string
+  /** Null when the learner did not answer before the reveal. They see the room only. */
+  ownText: string | null
   aggregate: RoomAggregate
   responses: ResponseEntry[]
   pearl: string
@@ -12,11 +13,12 @@ type Props = {
 
 /** What a learner sees after the reveal: their answer against the key and against the room. */
 export function LearnerFeedback({ ownText, aggregate, responses, pearl }: Props) {
-  const mine = new Set(matchDiagnoses(ownText).matched)
+  const answered = ownText !== null
+  const mine = new Set(answered ? matchDiagnoses(ownText).matched : [])
   const mineCannotMiss = aggregate.cannotMiss.filter((item) => mine.has(item.dx)).length
   const roomCannotMiss = aggregate.cannotMiss.filter((item) => item.count > 0).length
   const total = aggregate.cannotMiss.length
-  const others = aggregate.responseCount - 1
+  const learners = aggregate.responseCount
 
   const row = (item: { dx: string; name: string; count: number }) => (
     <li key={item.dx} className={mine.has(item.dx) ? 'mine' : item.count > 0 ? 'room-only' : 'nobody'}>
@@ -24,7 +26,7 @@ export function LearnerFeedback({ ownText, aggregate, responses, pearl }: Props)
         {mine.has(item.dx) ? '✓' : '·'}
       </span>
       <span className="feedback-name">{item.name}</span>
-      <span className="feedback-count">{item.count > 0 ? `${item.count} of ${aggregate.responseCount}` : 'nobody'}</span>
+      <span className="feedback-count">{item.count > 0 ? `${item.count} of ${learners}` : 'nobody'}</span>
     </li>
   )
 
@@ -32,11 +34,13 @@ export function LearnerFeedback({ ownText, aggregate, responses, pearl }: Props)
     <div className="feedback">
       <div className="feedback-score">
         <strong>
-          {mineCannotMiss} of {total}
+          {answered ? mineCannotMiss : roomCannotMiss} of {total}
         </strong>
         <span>
-          can&apos;t-miss diagnoses named by you. The room named {roomCannotMiss} of {total}
-          {others > 0 ? ` across ${aggregate.responseCount} learners` : ''}.
+          {answered
+            ? `can’t-miss diagnoses named by you. The room named ${roomCannotMiss} of ${total}`
+            : 'can’t-miss diagnoses named by the room'}
+          {learners > 1 ? ` across ${learners} learners` : ''}.
         </span>
       </div>
 
@@ -54,7 +58,7 @@ export function LearnerFeedback({ ownText, aggregate, responses, pearl }: Props)
         <p>{pearl}</p>
       </div>
 
-      {responses.length > 1 && (
+      {responses.length > (answered ? 1 : 0) && (
         <section>
           <h3>What the room wrote</h3>
           <ul className="room-answers">
@@ -66,10 +70,10 @@ export function LearnerFeedback({ ownText, aggregate, responses, pearl }: Props)
       )}
 
       <p className="muted feedback-legend">
-        ✓ you named it. Counts show how many learners named each one.
-        {mine.size === 0 && ' None of your answer matched a known diagnosis. Try full names or common abbreviations.'}
+        {answered && '✓ you named it. '}Counts show how many learners named each one.
+        {answered && mine.size === 0 && ' None of your answer matched a known diagnosis. Try full names or common abbreviations.'}
       </p>
-      <p className="sr-only">{Array.from(mine).map((dx) => diagnosisById[dx]?.name).join(', ')}</p>
+      {answered && <p className="sr-only">You named: {Array.from(mine).map((dx) => diagnosisById[dx]?.name).join(', ')}</p>}
     </div>
   )
 }

@@ -15,6 +15,12 @@ export type RoomAggregate = {
   roomCoverage: number
   /** Median share of can't-miss diagnoses each individual learner named. */
   medianLearnerCoverage: number
+  /** Each learner's share of can't-miss diagnoses named, in answer order. */
+  learnerCoverage: number[]
+  /** How many learners named at least one can't-miss diagnosis. */
+  learnersNamingCannotMiss: number
+  /** Distinct diagnoses the room named, on or off the key. */
+  distinctDiagnoses: number
   categoriesNamed: DiagnosisCategory[]
   categoriesMissing: DiagnosisCategory[]
   /** Diagnoses learners named that are not in the key, with counts. */
@@ -23,7 +29,7 @@ export type RoomAggregate = {
   unrecognized: string[]
 }
 
-const median = (values: number[]) => {
+export const median = (values: number[]) => {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
   const middle = Math.floor(sorted.length / 2)
@@ -71,6 +77,9 @@ export const aggregateResponses = (
     alsoConsider: tally(key.alsoConsider, counts),
     roomCoverage: key.cannotMiss.length ? namedCannotMiss / key.cannotMiss.length : 0,
     medianLearnerCoverage: median(perLearnerCoverage),
+    learnerCoverage: perLearnerCoverage,
+    learnersNamingCannotMiss: perLearnerCoverage.filter((value) => value > 0).length,
+    distinctDiagnoses: counts.size,
     categoriesNamed: Array.from(categoriesNamed),
     categoriesMissing: expectedCategoriesFor(key).filter((category) => !categoriesNamed.has(category)),
     offKey,

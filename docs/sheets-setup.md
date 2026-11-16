@@ -49,7 +49,11 @@ In Netlify, go to **Site configuration → Environment variables** and add:
 
 Then go to **Deploys → Trigger deploy → Deploy site**. When it finishes, the home page no longer shows the yellow "Demo mode" banner.
 
-The URL isn't a secret. Anyone with it can reach the same endpoints the site uses, and nothing else. Room changes still need a room's host key.
+The URL isn't a secret. Anyone with it can reach the same endpoints the site uses, and nothing else. Room changes and the session recap still need a room's host key.
+
+## 7. Check it with a phone
+
+Create a room on the live site. Open the host view on a laptop and scan the QR code with a phone on cellular data, not Wi-Fi. Start a round, submit an answer from the phone, and click Reveal. If the phone shows "How you compare", the whole path works.
 
 ## Updating the script later
 
@@ -64,7 +68,7 @@ There are no names, emails, or device identifiers. To clear the data, delete row
 
 ## Limits
 
-Each request takes 1 to 3 seconds. The host screen updates about every 3 seconds. Apps Script handles about 30 requests at once, which is far more than a group of 6 needs.
+Each request takes 1 to 3 seconds. The host screen updates about every 3 seconds. The server only accepts answers for the round the room is serving, and stops accepting them once a led round is revealed. Apps Script handles about 30 requests at once, which is far more than a group of 6 needs.
 
 ## Rehearse without Google
 
